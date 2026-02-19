@@ -1836,8 +1836,11 @@ export default function Admin() {
                     payload.minBookingHours = bikeForm.minBookingHours ? parseFloat(bikeForm.minBookingHours) : null;
                     payload.gstPercentage = bikeForm.gstPercentage !== undefined && bikeForm.gstPercentage !== '' ? parseFloat(bikeForm.gstPercentage) : 18.0;
 
-                    // Keep pricePerHour for backward compatibility
-                    if (bikeForm.pricePerHour) {
+                    // Ensure legacy pricePerHour is set when only tariff pricing is configured
+                    if (!bikeForm.pricePerHour && (bikeForm.weekdayRate || bikeForm.weekendRate)) {
+                      const baseRate = bikeForm.weekdayRate || bikeForm.weekendRate;
+                      payload.pricePerHour = parseFloat(baseRate);
+                    } else if (bikeForm.pricePerHour) {
                       payload.pricePerHour = parseFloat(bikeForm.pricePerHour);
                     }
                     if (editingBike) {

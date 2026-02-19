@@ -135,18 +135,22 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'Required fields missing: name, type, locationId' });
     }
 
-    // Validate that either pricingSlabs or legacy pricePerHour/kmLimit is provided
+    // Validate that some pricing configuration is provided
     const hasPricingSlabs = pricingSlabs && (
       pricingSlabs.hourly || 
       pricingSlabs.daily || 
       pricingSlabs.weekly
     );
-    const hasLegacyPricing = pricePerHour && kmLimit;
-    const hasSimplePricing = price12Hours;
+    // Legacy: allow pricePerHour even if kmLimit is not set
+    const hasLegacyPricing = pricePerHour;
+    // Simple pricing: 12-hour package or weekly price
+    const hasSimplePricing = price12Hours || pricePerWeek;
+    // Tariff-based pricing: weekday/weekend hourly rates
+    const hasTariffPricing = weekdayRate || weekendRate;
 
-    if (!hasPricingSlabs && !hasLegacyPricing && !hasSimplePricing) {
+    if (!hasPricingSlabs && !hasLegacyPricing && !hasSimplePricing && !hasTariffPricing) {
       return res.status(400).json({ 
-        message: 'Either pricingSlabs, pricePerHour/kmLimit, or price12Hours must be provided' 
+        message: 'Provide at least one pricing option: pricingSlabs, pricePerHour, price12Hours/pricePerWeek, or tariff rates' 
       });
     }
 

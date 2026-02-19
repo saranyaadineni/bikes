@@ -1836,7 +1836,10 @@ export default function SuperAdmin() {
                           }
                           
                           // Keep pricePerHour for backward compatibility
-                          if (bikeForm.pricePerHour) {
+                          if (!bikeForm.pricePerHour && (bikeForm.weekdayRate || bikeForm.weekendRate)) {
+                            const baseRate = bikeForm.weekdayRate || bikeForm.weekendRate;
+                            payload.pricePerHour = parseFloat(baseRate);
+                          } else if (bikeForm.pricePerHour) {
                             payload.pricePerHour = parseFloat(bikeForm.pricePerHour);
                           }
                     if (editingBike) {
