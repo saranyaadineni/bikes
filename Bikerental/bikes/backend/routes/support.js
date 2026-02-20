@@ -52,7 +52,10 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
   }
 });
 
-// Get all tickets (User sees own, Admin sees all)
+// Get all tickets
+// - Users see only their own tickets
+// - Admins see tickets for bikes in their assigned location
+// - Superadmins see all tickets
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
@@ -60,21 +63,32 @@ router.get('/', authenticateToken, async (req, res) => {
     
     if (user.role === 'user') {
       query = { userId: req.user.userId };
-    } else if (user.role === 'admin') {
-      // Admins only see tickets from their location users? Or all?
-      // For now, let's say Admins see all for simplicity, or we can filter by user location if needed.
-      // Assuming global support for now, or maybe filter by user's location.
-      // Let's stick to global for admins/superadmins to catch all issues.
     }
 
-    const tickets = await SupportTicket.find(query)
+    let tickets = await SupportTicket.find(query)
       .populate('userId', 'name email mobile')
       .populate({ 
         path: 'rentalId',
-        populate: { path: 'bikeId', select: 'name brand image' }
+        populate: { path: 'bikeId', select: 'name brand image locationId' }
       })
       .sort({ updatedAt: -1 });
-      
+
+    // For admins, filter tickets by bike location (admin's assigned location)
+    if (user.role === 'admin' && user.locationId) {
+      const adminLocationId = user.locationId.toString();
+      tickets = tickets.filter((ticket) => {
+        const rental = ticket.rentalId;
+        if (!rental || !rental.bikeId) return false;
+        const bike = rental.bikeId;
+        const loc = bike.locationId;
+        const bikeLocationId =
+          (loc && typeof loc === 'object' && loc._id)
+            ? loc._id.toString()
+            : (loc && loc.toString ? loc.toString() : loc);
+        return bikeLocationId === adminLocationId;
+      });
+    }
+
     res.json(tickets);
   } catch (error) {
     console.error('Get tickets error:', error);
@@ -117,7 +131,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
       .populate('userId', 'name email mobile')
       .populate({ 
         path: 'rentalId',
-        populate: { path: 'bikeId', select: 'name brand image' }
+        populate: { path: 'bikeId', select: 'name brand image locationId' }
       })
       .populate('messages.senderId', 'name role');
 
@@ -177,7 +191,7 @@ router.post('/:id/messages', authenticateToken, async (req, res) => {
       .populate('userId', 'name email mobile')
       .populate({ 
         path: 'rentalId',
-        populate: { path: 'bikeId', select: 'name brand image' }
+        populate: { path: 'bikeId', select: 'name brand image locationId' }
       })
       .populate('messages.senderId', 'name role');
       

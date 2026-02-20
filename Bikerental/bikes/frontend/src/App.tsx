@@ -24,8 +24,8 @@ const ContactUs = lazy(() => import("./pages/ContactUs"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Support = lazy(() => import("./pages/Support"));
-const Blog = lazy(() => import("./pages/Blog"));
-const BlogPost = lazy(() => import("./pages/BlogPost"));
+// const Blog = lazy(() => import("./pages/Blog"));
+// const BlogPost = lazy(() => import("./pages/BlogPost"));
 
 // Simplified Page Loader
 const PageLoader = () => (
@@ -66,8 +66,6 @@ const App = () => (
               <Route path="/faq" element={<FAQ />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/support" element={<Support />} />
-              <Route path="/blog" element={<Blog />} />
-              <Route path="/blog/:slug" element={<BlogPost />} />
               <Route path="/auth" element={<Auth />} />
               <Route
                 path="/dashboard"

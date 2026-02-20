@@ -26,7 +26,6 @@ export const Footer = memo(function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><Link to="/garage" className="hover:text-primary transition-colors">Browse Bikes</Link></li>
               <li><Link to="/tariff" className="hover:text-primary transition-colors">Tariffs</Link></li>
-              <li><Link to="/blog" className="hover:text-primary transition-colors">Blog & Guides</Link></li>
               <li><Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link></li>
             </ul>
           </div>

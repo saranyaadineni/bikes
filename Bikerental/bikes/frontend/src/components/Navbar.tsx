@@ -47,11 +47,6 @@ export const Navbar = memo(function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Support button navigation
-  const handleSupportClick = useCallback(() => {
-    navigate('/support');
-  }, [navigate]);
-
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -196,7 +191,6 @@ export const Navbar = memo(function Navbar() {
         { path: '/', label: 'Home' },
         { path: '/tariff', label: 'Garage' },
         { path: '/garage', label: 'Ride Finder' },
-        { path: '/blog', label: 'Blog' },
         { path: '/about', label: 'About Us' },
         { path: '/contact', label: 'Contact Us' },
         { path: '/faq', label: 'FAQ' },
@@ -236,11 +230,22 @@ export const Navbar = memo(function Navbar() {
 
           {/* Location Selector & Auth Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            {user && !isSuperAdmin && (
-              <Button variant="outline" className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200" onClick={handleSupportClick}>
-                <Activity className="w-4 h-4 mr-2" />
-                Help
-              </Button>
+            {!isSuperAdmin && locations.length > 0 && (
+              <Select value={selectedLocation} onValueChange={handleLocationChange}>
+                <SelectTrigger className="w-48">
+                  <MapPin className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Select location">
+                    {selectedLocationData ? formatLocationDisplay(selectedLocationData) : 'Select location'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {formatLocationDisplay(loc)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
             {user ? (
               <>
@@ -298,25 +303,6 @@ export const Navbar = memo(function Navbar() {
                           </span>
                         </Link>
                       </DropdownMenuItem>
-                    )}
-
-                    {/* Location Selector */}
-                    {locations.length > 0 && (
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>
-                          <MapPin className="h-4 w-4 mr-2" />
-                          <span>Location: {selectedLocationData ? formatLocationDisplay(selectedLocationData) : 'Select'}</span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent>
-                          <DropdownMenuRadioGroup value={selectedLocation} onValueChange={handleLocationChange}>
-                            {locations.map((loc) => (
-                              <DropdownMenuRadioItem key={loc.id} value={loc.id}>
-                                {formatLocationDisplay(loc)}
-                              </DropdownMenuRadioItem>
-                            ))}
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
                     )}
 
                     {/* Dark Mode Toggle */}
