@@ -144,23 +144,15 @@ export default function Garage() {
   
   // Calculate max dropoff date (up to 7 days window)
   const maxDropoffDate = useMemo(() => {
-    if (!pickupDate || !pickupTime) {
-      // If no pickup selected, allow up to 7 days from today
+    if (!pickupDate) {
       const maxDate = new Date();
-      maxDate.setDate(maxDate.getDate() + 7);
+      maxDate.setDate(maxDate.getDate() + 14); 
       return maxDate.toISOString().slice(0, 10);
     }
-    const pickup = new Date(`${pickupDate}T${pickupTime}`);
-    const maxFromPickup = new Date(pickup);
-    maxFromPickup.setDate(maxFromPickup.getDate() + 7); // Maximum 7 days from pickup
-    
-    const maxFromToday = new Date();
-    maxFromToday.setDate(maxFromToday.getDate() + 7); // 7 days from today
-    
-    // Return the earlier of the two dates
-    const maxDate = maxFromPickup < maxFromToday ? maxFromPickup : maxFromToday;
-    return maxDate.toISOString().slice(0, 10);
-  }, [pickupDate, pickupTime]);
+    const pickup = new Date(pickupDate);
+    pickup.setDate(pickup.getDate() + 7);
+    return pickup.toISOString().slice(0, 10);
+  }, [pickupDate]);
 
   const minutesToHHMM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   
@@ -173,16 +165,31 @@ export default function Garage() {
     return `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
   };
 
-  const generateTimes = useCallback((minHHMM: string) => {
-    const [hStr, mStr] = minHHMM.split(':');
-    let startMin = (parseInt(hStr || '0', 10) * 60) + parseInt(mStr || '0', 10);
-    startMin = Math.min(24 * 60 - 30, Math.max(0, Math.ceil(startMin / 30) * 30));
+  // Pre-calculate all possible 30-minute time slots in a day
+  const allTimeOptions = useMemo(() => {
     const opts: string[] = [];
-    for (let m = startMin; m <= 23 * 60 + 30; m += 30) {
+    for (let m = 0; m < 24 * 60; m += 30) {
       opts.push(minutesToHHMM(m));
     }
     return opts;
-  }, []);
+  }, []); // `minutesToHHMM` is stable, so this runs only once.
+
+  // `generateTimes` is now a lightweight slice operation on the pre-calculated options
+  const generateTimes = useCallback((minHHMM: string) => {
+    const [hStr, mStr] = minHHMM.split(':');
+    let startMin = (parseInt(hStr || '0', 10) * 60) + parseInt(mStr || '0', 10);
+    // Round up to the nearest 30-minute mark and clamp the value
+    startMin = Math.min(23 * 60 + 30, Math.max(0, Math.ceil(startMin / 30) * 30));
+    
+    const startTime = minutesToHHMM(startMin);
+    const startIndex = allTimeOptions.indexOf(startTime);
+
+    if (startIndex === -1) {
+      return []; // Return empty if calculated start time is out of bounds
+    }
+    
+    return allTimeOptions.slice(startIndex);
+  }, [allTimeOptions]);
 
   const pickupOptions = useMemo(() => generateTimes(pickupTimeMin), [generateTimes, pickupTimeMin]);
   const dropoffOptions = useMemo(() => generateTimes(dropoffTimeMin), [generateTimes, dropoffTimeMin]);

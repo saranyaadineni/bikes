@@ -368,7 +368,13 @@ function CreateTicketDialog({ open, onOpenChange, onSuccess }: { open: boolean; 
             </div>
             <Input 
               value={subject} 
-              onChange={(e) => setSubject(e.target.value)} 
+              onChange={(e) => {
+                const val = e.target.value;
+                // Allow only alphabets and spaces
+                if (/^[a-zA-Z\s]*$/.test(val)) {
+                  setSubject(val);
+                }
+              }} 
               placeholder="Brief summary of the issue" 
               required 
               minLength={5}
