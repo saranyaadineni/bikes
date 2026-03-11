@@ -101,6 +101,10 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    overflow-x: auto;
+    overflow-y: auto;
+    height: auto;
+    min-height: 100vh;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -179,6 +183,14 @@
 
   .animate-pulse-glow {
     animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 

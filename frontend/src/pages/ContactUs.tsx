@@ -68,12 +68,41 @@ export default function ContactUs() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.firstName || !formData.email || !formData.message) {
+    
+    // Email validation regex
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    
+    if (!formData.firstName.trim()) {
+      toast({ title: "Validation Error", description: "First name is required.", variant: "destructive" });
+      return;
+    }
+    
+    if (!formData.email.trim()) {
+      toast({ title: "Validation Error", description: "Email is required.", variant: "destructive" });
+      return;
+    }
+
+    if (!emailRegex.test(formData.email)) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
+        title: "Invalid Email",
+        description: "Please enter a valid email address (e.g., example@gmail.com).",
         variant: "destructive",
       });
+      return;
+    }
+
+    if (formData.email.length > 100) {
+      toast({ title: "Validation Error", description: "Email cannot exceed 100 characters.", variant: "destructive" });
+      return;
+    }
+
+    if (!formData.message.trim()) {
+      toast({ title: "Validation Error", description: "Message is required.", variant: "destructive" });
+      return;
+    }
+
+    if (formData.message.length > 500) {
+      toast({ title: "Validation Error", description: "Message cannot exceed 500 characters.", variant: "destructive" });
       return;
     }
 
@@ -250,16 +279,25 @@ export default function ContactUs() {
                     value={formData.email}
                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                     disabled={loading}
+                    maxLength={100}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Message</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium">Message</label>
+                    <span className={`text-[10px] ${formData.message.length > 500 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {formData.message.length}/500
+                    </span>
+                  </div>
                   <Textarea 
                     placeholder="How can we help you?" 
                     className="min-h-[120px]" 
                     value={formData.message}
                     onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
                     disabled={loading}
+                    maxLength={500}
+                    required
                   />
                 </div>
                 <Button className="w-full" disabled={loading}>

@@ -198,7 +198,7 @@ export default function Index() {
       <main>
         {/* Hero Section */}
       <section 
-        className={`relative pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden ${
+        className={`relative pt-24 pb-16 md:pt-32 md:pb-24 ${
           !heroImages.length && homeHeroImageUrl
             ? 'min-h-screen md:min-h-[80vh] bg-no-repeat bg-cover bg-center md:bg-cover md:bg-center md:bg-fixed'
             : 'min-h-screen md:min-h-[80vh]'
@@ -342,7 +342,7 @@ export default function Index() {
       {/* CTA Section */}
       <section className="py-16">
         <div className="container mx-auto px-4">
-          <div className="relative rounded-3xl overflow-hidden gradient-dark p-8 md:p-16">
+          <div className="relative rounded-3xl gradient-dark p-8 md:p-16">
             <div className="relative z-10 text-center">
               <h2 className="text-3xl md:text-4xl font-display font-bold text-secondary-foreground mb-4">
                 Ready to Ride?

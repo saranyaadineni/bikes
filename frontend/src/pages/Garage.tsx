@@ -691,11 +691,11 @@ export default function Garage() {
 
             <section className="md:col-span-8 lg:col-span-9">
               <div className="bg-card rounded-2xl p-3 md:p-4 shadow-card mb-4">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-y-4 gap-x-6">
+                  <div className="flex items-center gap-3 shrink-0">
                     <span className="text-sm text-muted-foreground shrink-0">Sort by</span>
                     <Select value={sortBy} onValueChange={(val) => setSortBy(val as typeof sortBy)}>
-                      <SelectTrigger className="w-full md:w-64">
+                      <SelectTrigger className="w-[180px] sm:w-64">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -717,10 +717,10 @@ export default function Garage() {
                     />
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1 justify-start md:justify-end">
                     <span className="text-sm text-muted-foreground shrink-0">Model</span>
-                    <div className="relative -mx-2 w-full md:w-auto">
-                      <div className="overflow-x-auto whitespace-nowrap px-2">
+                    <div className="relative min-w-0 max-w-full">
+                      <div className="overflow-x-auto whitespace-nowrap pb-1 no-scrollbar">
                         <ToggleGroup
                           type="single"
                           value={selectedType}

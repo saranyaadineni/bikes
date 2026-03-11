@@ -48,8 +48,15 @@ export const Navbar = memo(function Navbar() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    if (mobileMenuOpen) {
+      document.body.classList.add('overflow-hidden');
+    } else {
+      document.body.classList.remove('overflow-hidden');
+    }
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    };
+  }, [mobileMenuOpen]);
 
   const loadActiveRide = useCallback(async (currentUser: any) => {
     // Silently handle errors - don't show errors for auth failures
@@ -222,7 +229,7 @@ export const Navbar = memo(function Navbar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-8">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
@@ -239,7 +246,7 @@ export const Navbar = memo(function Navbar() {
           </div>
 
           {/* Location Selector & Auth Buttons */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             {!isSuperAdmin && locations.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -373,7 +380,7 @@ export const Navbar = memo(function Navbar() {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2"
+            className="lg:hidden p-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? (
@@ -386,7 +393,7 @@ export const Navbar = memo(function Navbar() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-border animate-fade-in">
+          <div className="lg:hidden py-4 border-t border-border animate-fade-in max-h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="flex flex-col gap-4">
               {/* Active Ride Button for Mobile */}
               {user && activeRide && !['admin', 'superadmin'].includes(user.role) && (

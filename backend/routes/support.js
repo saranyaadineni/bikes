@@ -207,6 +207,25 @@ router.post('/', async (req, res) => {
   try {
     const { subject, category, description, rentalId, images, locationId, guestName, guestEmail } = req.body;
     
+    // Server-side validation
+    if (category === 'contact') {
+      if (!guestEmail || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(guestEmail)) {
+        return res.status(400).json({ message: 'A valid email address is required.' });
+      }
+      if (guestEmail.length > 100) {
+        return res.status(400).json({ message: 'Email cannot exceed 100 characters.' });
+      }
+      if (!description || description.trim().length === 0) {
+        return res.status(400).json({ message: 'Message content is required.' });
+      }
+      if (description.length > 500) {
+        return res.status(400).json({ message: 'Message cannot exceed 500 characters.' });
+      }
+      if (!guestName || guestName.trim().length === 0) {
+        return res.status(400).json({ message: 'Name is required.' });
+      }
+    }
+
     // Check for auth token manually to handle both guest and logged-in users
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
