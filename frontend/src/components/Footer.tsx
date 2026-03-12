@@ -67,7 +67,7 @@ export const Footer = memo(function Footer() {
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-primary" />
-                  {locationName ? `${locationName.toLowerCase().replace(/\s+/g, '')}@bikerental.com` : 'hello@rideflow.com'}
+                  {locationName ? `${locationName.toLowerCase().replace(/\s+/g, '')}@bikerental.com` : 'info@bikerental.com'}
                 </li>
                 <li className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-primary" />

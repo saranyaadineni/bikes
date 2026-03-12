@@ -34,7 +34,7 @@ export const generateInvoice = (rental: any, currentUser?: any) => {
   doc.setTextColor(100);
   doc.text(companyName, 14, 30);
   doc.text(companyAddress, 14, 35);
-  doc.text("support@rideflow.com", 14, 40);
+  doc.text("info@bikerental.com", 14, 40);
 
   // Invoice Details
   doc.setFontSize(10);
@@ -152,7 +152,7 @@ export const generateInvoice = (rental: any, currentUser?: any) => {
   doc.setFontSize(8);
   doc.setTextColor(150);
   doc.text("Thank you for choosing RideFlow!", 14, pageHeight - 20);
-  doc.text("For any queries, contact support@rideflow.com", 14, pageHeight - 15);
+  doc.text("For any queries, contact info@bikerental.com", 14, pageHeight - 15);
 
   // Save PDF
   doc.save(`Invoice_${rentalId}.pdf`);

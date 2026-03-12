@@ -11,8 +11,8 @@ import { SEO } from "@/components/SEO";
 import { useToast } from "@/hooks/use-toast";
 
 const DEFAULT_CONTACT = {
-  email: 'support@rideflow.com',
-  phone: '+91 98765 43210',
+  email: '',
+  phone: '',
   address: 'Select a location to see details'
 };
 
