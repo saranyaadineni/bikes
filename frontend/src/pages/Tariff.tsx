@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
-import { bikesAPI, locationsAPI } from '@/lib/api';
+import { bikesAPI, locationsAPI, documentsAPI, getCurrentUser } from '@/lib/api';
 import { Bike } from '@/types';
 import { BikeCard } from '@/components/BikeCard';
 import { SEO } from '@/components/SEO';
@@ -11,6 +11,8 @@ export default function Tariff() {
   const navigate = useNavigate();
   const [bikes, setBikes] = useState<Bike[]>([]);
   const [cityName, setCityName] = useState<string>('Your City');
+  const [docStatus, setDocStatus] = useState({ allApproved: false, hasDocs: false });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -27,7 +29,25 @@ export default function Tariff() {
       }
     };
     load();
+    const user = getCurrentUser();
+    setIsLoggedIn(!!user);
+    if (user) {
+      checkDocuments();
+    }
   }, []);
+
+  const checkDocuments = async () => {
+    const user = getCurrentUser();
+    if (!user) return;
+    try {
+      const userDocs = await documentsAPI.getAll();
+      const hasDocs = userDocs && userDocs.length > 0;
+      const allApproved = hasDocs && userDocs.every((doc: any) => doc.status === 'approved');
+      setDocStatus({ allApproved, hasDocs });
+    } catch (error) {
+      console.error("Failed to check documents", error);
+    }
+  };
 
   const formatPrice = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
 
@@ -51,7 +71,7 @@ export default function Tariff() {
               "@type": "ListItem",
               "position": 2,
               "name": "Tariffs",
-              "item": "https://rideflow.com/tariff"
+              "item": "https://rideflow.com/garage"
             }
           ]
         }}
@@ -78,7 +98,9 @@ export default function Tariff() {
               >
                 <BikeCard
                   bike={bike}
-                  onRent={(b) => navigate(`/garage?rent=1&bikeId=${encodeURIComponent(b.id)}`)}
+                  onRent={(b) => navigate(`/ride-finder?rent=1&bikeId=${encodeURIComponent(b.id)}`)}
+                  docStatus={docStatus}
+                  isLoggedIn={isLoggedIn}
                 />
               </div>
             ))}

@@ -65,25 +65,29 @@ export function calculateSimplePrice(
     const effectiveDuration = Math.max(durationHours, minHours);
     
     let tariffCost = 0;
-    let tempDate = new Date(startDate);
-    // Iterate through each hour (or part thereof)
-    // We use effectiveDuration for billing
+    // Iterate through each hour (or part thereof) using a more robust loop
     let hoursLeft = effectiveDuration;
+    let currentTempDate = new Date(startDate);
     
-    // For calculation accuracy, we can just iterate minute by minute or use hourly blocks.
-    // Given the rates are "per hour", hourly iteration is standard.
-    // If we start at 10:30, 10:30-11:30 is one hour.
+    // Safety counter to prevent infinite loops
+    let iterations = 0;
+    const maxIterations = 10000; // Far more than any reasonable booking duration
     
-    while (hoursLeft > 0) {
-      const isWe = isWeekend(tempDate);
+    while (hoursLeft > 0 && iterations < maxIterations) {
+      iterations++;
+      const isWe = isWeekend(currentTempDate);
       const rate = isWe ? (bike.weekendRate || 0) : (bike.weekdayRate || 0);
       
-      const step = Math.min(hoursLeft, 1); // Calculate in 1-hour chunks max
+      const step = Math.min(hoursLeft, 1);
       tariffCost += rate * step;
       
       hoursLeft -= step;
-      // Move time forward by the step
-      tempDate.setTime(tempDate.getTime() + (step * 60 * 60 * 1000));
+      // Advance by exactly the step taken
+      currentTempDate.setTime(currentTempDate.getTime() + (step * 3600000));
+    }
+    
+    if (iterations >= maxIterations) {
+      console.error('Infinite loop detected in calculateSimplePrice for bike:', bike.name);
     }
     
     basePrice = tariffCost;

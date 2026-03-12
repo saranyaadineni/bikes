@@ -248,15 +248,14 @@ export default function Index() {
               </p>
 
               <div className="flex flex-wrap gap-4">
-                <Link to="/garage">
-                  <Button variant="hero" className="md:h-14 md:px-10 md:text-lg md:rounded-xl">
+                <Link to="/ride-finder">
+                  <Button size="lg" className="h-14 px-8 text-lg font-semibold shadow-hero">
                     Browse Bikes
-                    <ArrowRight className="h-5 w-5" />
                   </Button>
                 </Link>
-                <Link to="/auth?mode=signup">
-                  <Button variant="dark" className="md:h-14 md:px-10 md:text-lg md:rounded-xl">
-                    Create Account
+                <Link to="/garage">
+                  <Button variant="outline" size="lg" className="h-14 px-8 text-lg font-semibold bg-background/50 backdrop-blur-sm">
+                    View Tariffs
                   </Button>
                 </Link>
               </div>
@@ -305,7 +304,7 @@ export default function Index() {
                 }
               </p>
             </div>
-            <Link to="/garage">
+            <Link to="/ride-finder">
               <Button variant="outline" className="hidden md:flex">
                 View All
                 <ArrowRight className="h-4 w-4" />
@@ -322,14 +321,14 @@ export default function Index() {
               >
                 <BikeCard
                   bike={bike}
-                  onRent={(b) => navigate(`/garage?rent=1&bikeId=${encodeURIComponent(b.id)}`)}
+                  onRent={(b) => navigate(`/ride-finder?rent=1&bikeId=${encodeURIComponent(b.id)}`)}
                 />
               </div>
             ))}
           </div>
 
           <div className="mt-8 text-center md:hidden">
-            <Link to="/garage">
+            <Link to="/ride-finder">
               <Button variant="outline">
                 View All Bikes
                 <ArrowRight className="h-4 w-4" />

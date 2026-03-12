@@ -16,6 +16,8 @@ interface BikeCardProps {
   pickupDateTime?: Date;
   dropoffDateTime?: Date;
   durationHours?: number;
+  docStatus?: { allApproved: boolean; hasDocs: boolean };
+  isLoggedIn?: boolean;
 }
 
 const typeIcons = {
@@ -39,8 +41,9 @@ const formatDate = (date: Date) => {
 };
 
 const BikeImageSlider = memo(({ bike, TypeIcon, iconClassName = "h-20 w-20" }: { bike: Bike; TypeIcon: any; iconClassName?: string }) => {
-  const plugin = useRef(
-    Autoplay({ delay: 3000, stopOnInteraction: true, stopOnMouseEnter: true })
+  const plugin = useMemo(
+    () => Autoplay({ delay: 3000, stopOnInteraction: true, stopOnMouseEnter: true }),
+    []
   );
 
   const images = useMemo(() => {
@@ -68,9 +71,9 @@ const BikeImageSlider = memo(({ bike, TypeIcon, iconClassName = "h-20 w-20" }: {
     <Carousel 
       className="w-full h-full group/carousel" 
       opts={{ loop: true }}
-      plugins={[plugin.current]}
-      onMouseEnter={plugin.current.stop}
-      onMouseLeave={plugin.current.reset}
+      plugins={[plugin]}
+      onMouseEnter={plugin.stop}
+      onMouseLeave={plugin.reset}
     >
       <CarouselContent className="-ml-0 h-full">
         {images.map((img, idx) => (
@@ -89,7 +92,7 @@ const BikeImageSlider = memo(({ bike, TypeIcon, iconClassName = "h-20 w-20" }: {
 
 BikeImageSlider.displayName = 'BikeImageSlider';
 
-export const BikeCard = memo(({ bike, onRent, variant = 'grid', pickupDateTime, dropoffDateTime, durationHours }: BikeCardProps) => {
+export const BikeCard = memo(({ bike, onRent, variant = 'grid', pickupDateTime, dropoffDateTime, durationHours, docStatus, isLoggedIn }: BikeCardProps) => {
   const TypeIcon = typeIcons[bike.type];
   const availableSlabs = getAvailablePricingSlabs(bike);
   const [selectedPricingType, setSelectedPricingType] = useState<'hourly' | 'daily' | 'weekly'>(
@@ -212,10 +215,11 @@ export const BikeCard = memo(({ bike, onRent, variant = 'grid', pickupDateTime, 
           <Button
             className="w-full"
             variant={bike.available ? 'default' : 'secondary'}
-            disabled={!bike.available}
+            disabled={!bike.available || (isLoggedIn && !docStatus?.allApproved)}
             onClick={() => onRent?.(bike, selectedPricingType)}
+            title={isLoggedIn && !docStatus?.allApproved ? "Please upload and get your documents approved to book a ride." : ""}
           >
-            {bike.available ? 'Book' : 'Not Available'}
+            {!isLoggedIn ? 'Login to Book' : !docStatus?.allApproved ? 'Documents not verified' : bike.available ? 'Rent Now' : 'Not Available'}
           </Button>
         </div>
       </div>
@@ -335,10 +339,11 @@ export const BikeCard = memo(({ bike, onRent, variant = 'grid', pickupDateTime, 
           <Button
             className={priceInfo || (durationHours && durationHours > 0) ? "flex-1" : "w-full"}
             variant={bike.available ? 'default' : 'secondary'}
-            disabled={!bike.available}
+            disabled={!bike.available || (isLoggedIn && !docStatus?.allApproved)}
             onClick={() => onRent?.(bike, selectedPricingType)}
+            title={isLoggedIn && !docStatus?.allApproved ? "Please upload and get your documents approved to book a ride." : ""}
           >
-            {bike.available ? 'Rent Now' : 'Not Available'}
+            {!isLoggedIn ? 'Login to Book' : !docStatus?.allApproved ? 'Documents not verified' : bike.available ? 'Rent Now' : 'Not Available'}
           </Button>
         </div>
       </div>

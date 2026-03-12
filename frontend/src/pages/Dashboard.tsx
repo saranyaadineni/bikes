@@ -31,6 +31,12 @@ const rentalStatusStyles = {
   cancelled: { color: 'bg-destructive/10 text-destructive', icon: XCircle },
 };
 
+const statusStyles = {
+  pending: { color: 'bg-yellow-500/10 text-yellow-500', icon: Clock },
+  approved: { color: 'bg-green-500/10 text-green-500', icon: CheckCircle },
+  rejected: { color: 'bg-destructive/10 text-destructive', icon: XCircle },
+};
+
 const formatLocationDisplay = (loc: any): string => {
   if (!loc) return '';
   // Show only the city name as per requirement
@@ -466,7 +472,7 @@ export default function Dashboard() {
                                   </p>
                                 </div>
                               </div>
-                              <Badge className={statusStyles[rental.status as keyof typeof statusStyles]?.color || 'bg-muted'}>
+                              <Badge className={rentalStatusStyles[rental.status as keyof typeof rentalStatusStyles]?.color || 'bg-muted'}>
                                 <StatusIcon className="h-3 w-3 mr-1" />
                                 {rental.status.charAt(0).toUpperCase() + rental.status.slice(1)}
                               </Badge>

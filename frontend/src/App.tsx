@@ -56,8 +56,8 @@ const App = () => (
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/ride-finder" element={<Tariff />} />
               <Route path="/garage" element={<Garage />} />
-              <Route path="/tariff" element={<Tariff />} />
               <Route path="/payment" element={<Payment />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/active-ride" element={<ActiveRide />} />

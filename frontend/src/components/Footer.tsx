@@ -43,8 +43,8 @@ export const Footer = memo(function Footer() {
           <div>
             <h4 className="font-display font-semibold mb-4">Quick Links</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link to="/garage" className="hover:text-primary transition-colors">Browse Bikes</Link></li>
-              <li><Link to="/tariff" className="hover:text-primary transition-colors">Tariffs</Link></li>
+              <li><Link to="/ride-finder" className="hover:text-primary transition-colors">Browse Bikes</Link></li>
+              <li><Link to="/garage" className="hover:text-primary transition-colors">Tariffs</Link></li>
               <li><Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link></li>
             </ul>
           </div>

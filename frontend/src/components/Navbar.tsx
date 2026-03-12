@@ -206,8 +206,8 @@ export const Navbar = memo(function Navbar() {
       ]
     : [
         { path: '/', label: 'Home' },
-        { path: '/tariff', label: 'Garage' },
-        { path: '/garage', label: 'Ride Finder' },
+        { path: '/ride-finder', label: 'Ride Finder' },
+        { path: '/garage', label: 'Garage' },
         { path: '/about', label: 'About Us' },
         { path: '/contact', label: 'Contact Us' },
         { path: '/faq', label: 'FAQ' },

@@ -97,7 +97,7 @@ export default function BlogPost() {
                </div>
             </div>
             
-            <Link to="/garage">
+            <Link to="/ride-finder">
               <Button variant="hero" className="rounded-xl">
                 Rent a Bike Now
               </Button>

@@ -17,10 +17,16 @@ export function isWeekend(date: Date): boolean {
  * Check if any part of the rental period falls on a weekend
  */
 export function hasWeekendPeriod(startDate: Date, endDate: Date): boolean {
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return false;
+  if (startDate > endDate) return false;
+  
   const current = new Date(startDate);
   const end = new Date(endDate);
   
-  while (current <= end) {
+  // Safety counter
+  let days = 0;
+  while (current <= end && days < 100) { // Max 100 days
+    days++;
     if (isWeekend(current)) {
       return true;
     }

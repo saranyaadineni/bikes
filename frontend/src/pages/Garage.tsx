@@ -36,16 +36,35 @@ export default function Garage() {
   const [pickupTime, setPickupTime] = useState('');
   const [dropoffDate, setDropoffDate] = useState('');
   const [dropoffTime, setDropoffTime] = useState('');
-  const [timeFilterApplied, setTimeFilterApplied] = useState(false);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [isBookingConfirmationOpen, setIsBookingConfirmationOpen] = useState(false);
   const [selectedBike, setSelectedBike] = useState<Bike | null>(null);
   const [selectedPricingType, setSelectedPricingType] = useState<'hourly' | 'daily' | 'weekly'>('hourly');
   const [sortBy, setSortBy] = useState<'relevance' | 'priceLow' | 'priceHigh'>('relevance');
+  const [docStatus, setDocStatus] = useState({ allApproved: false, hasDocs: false });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     loadBikes();
+    const user = getCurrentUser();
+    setIsLoggedIn(!!user);
+    if (user) {
+      checkDocuments();
+    }
   }, []);
+
+  const checkDocuments = async () => {
+    const user = getCurrentUser();
+    if (!user) return;
+    try {
+      const userDocs = await documentsAPI.getAll();
+      const hasDocs = userDocs && userDocs.length > 0;
+      const allApproved = hasDocs && userDocs.every((doc: any) => doc.status === 'approved');
+      setDocStatus({ allApproved, hasDocs });
+    } catch (error) {
+      console.error("Failed to check documents", error);
+    }
+  };
 
   const loadBikes = async () => {
     try {
@@ -110,10 +129,12 @@ export default function Garage() {
     return new Date(`${dateStr}T${timeStr}`);
   };
 
-  const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
-  const toHHMM = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  const nowHHMM = toHHMM(now);
+  const { todayStr, nowHHMM, toHHMM, now } = useMemo(() => {
+    const d = new Date();
+    const tStr = d.toISOString().slice(0, 10);
+    const f = (date: Date) => `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    return { todayStr: tStr, nowHHMM: f(d), toHHMM: f, now: d };
+  }, []); // Only calculate once on mount to keep identities stable
   
   const pickupTimeMin = useMemo(() => {
     return pickupDate === todayStr ? nowHHMM : '00:00';
@@ -127,13 +148,19 @@ export default function Garage() {
     return dropoffDate && pickupDT && dropoffDate === pickupDate
       ? toHHMM(new Date(pickupDT.getTime() + 30 * 60000))
       : baseDropMinDate;
-  }, [dropoffDate, todayStr, nowHHMM, pickupDT, pickupDate]);
+  }, [dropoffDate, todayStr, nowHHMM, pickupDT, pickupDate, toHHMM]);
 
   const dropoffDT = useMemo(() => getDateTime(dropoffDate, dropoffTime), [dropoffDate, dropoffTime]);
   
+  // Calculate total duration in minutes
   const durationMinutes = useMemo(() => {
-    return pickupDT && dropoffDT ? Math.max(0, Math.round((dropoffDT.getTime() - pickupDT.getTime()) / 60000)) : 0;
+    if (!pickupDT || !dropoffDT) return 0;
+    const diff = dropoffDT.getTime() - pickupDT.getTime();
+    if (isNaN(diff)) return 0;
+    return Math.max(0, Math.round(diff / 60000));
   }, [pickupDT, dropoffDT]);
+
+  const durationHours = useMemo(() => durationMinutes / 60, [durationMinutes]);
   
   // Calculate max pickup date (7 days from today) - use useMemo to ensure it updates
   const maxPickupDate = useMemo(() => {
@@ -176,23 +203,34 @@ export default function Garage() {
 
   // `generateTimes` is now a lightweight slice operation on the pre-calculated options
   const generateTimes = useCallback((minHHMM: string) => {
-    const [hStr, mStr] = minHHMM.split(':');
-    let startMin = (parseInt(hStr || '0', 10) * 60) + parseInt(mStr || '0', 10);
-    // Round up to the nearest 30-minute mark and clamp the value
-    startMin = Math.min(23 * 60 + 30, Math.max(0, Math.ceil(startMin / 30) * 30));
+    if (!minHHMM || typeof minHHMM !== 'string') return allTimeOptions;
     
-    const startTime = minutesToHHMM(startMin);
+    const [hStr, mStr] = minHHMM.split(':');
+    let h = parseInt(hStr, 10);
+    let m = parseInt(mStr, 10);
+    
+    if (isNaN(h)) h = 0;
+    if (isNaN(m)) m = 0;
+    
+    const startMin = (h * 60) + m;
+    // Round up to the nearest 30-minute mark and clamp the value
+    const roundedMin = Math.min(23 * 60 + 30, Math.max(0, Math.ceil(startMin / 30) * 30));
+    
+    const startTime = minutesToHHMM(roundedMin);
     const startIndex = allTimeOptions.indexOf(startTime);
 
     if (startIndex === -1) {
-      return []; // Return empty if calculated start time is out of bounds
+      // If we can't find the exact time, filter manually for safety
+      return allTimeOptions.filter(t => {
+        const [th, tm] = t.split(':').map(n => parseInt(n, 10));
+        return (th * 60 + tm) >= startMin;
+      });
     }
     
     return allTimeOptions.slice(startIndex);
-  }, [allTimeOptions]);
+  }, [allTimeOptions, minutesToHHMM]);
 
-  const pickupOptions = useMemo(() => generateTimes(pickupTimeMin), [generateTimes, pickupTimeMin]);
-  const dropoffOptions = useMemo(() => generateTimes(dropoffTimeMin), [generateTimes, dropoffTimeMin]);
+
 
   const applyTimeFilter = () => {
     if (!pickupDate || !pickupTime || !dropoffDate || !dropoffTime) {
@@ -203,16 +241,13 @@ export default function Garage() {
       const adjusted = new Date(pickupDT.getTime() + 30 * 60000);
       setDropoffDate(adjusted.toISOString().slice(0, 10));
       setDropoffTime(adjusted.toTimeString().slice(0, 5));
-      setTimeFilterApplied(true);
       return;
     }
     if (sameDay && durationMinutes < 30 && pickupDT) {
       const adjusted = new Date(pickupDT.getTime() + 30 * 60000);
       setDropoffTime(adjusted.toTimeString().slice(0, 5));
-      setTimeFilterApplied(true);
       return;
     }
-    setTimeFilterApplied(true);
   };
 
   const searchAvailable = async () => {
@@ -227,7 +262,6 @@ export default function Garage() {
       const savedLocation = localStorage.getItem('selectedLocation') || undefined;
       const available = await bikesAPI.getAvailable(start, end, savedLocation);
       setBikes(available);
-      setTimeFilterApplied(true);
       setIsSearchDialogOpen(false);
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Failed to fetch availability', variant: 'destructive' });
@@ -288,6 +322,13 @@ export default function Garage() {
     if (pickupDate && pickupTime && dropoffDate && dropoffTime) {
       setIsBookingConfirmationOpen(true);
     } else {
+      const now = new Date();
+      setPickupDate(now.toISOString().slice(0, 10));
+      setPickupTime(toHHMM(now));
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setDropoffDate(tomorrow.toISOString().slice(0, 10));
+      setDropoffTime(toHHMM(tomorrow));
       setIsSearchDialogOpen(true);
     }
   };
@@ -439,7 +480,7 @@ export default function Garage() {
                   "priceCurrency": "INR",
                   "price": bike.weekdayRate || bike.pricePerHour || 0,
                   "availability": "https://schema.org/InStock",
-                  "url": `https://rideflow.com/garage?bikeId=${bike.id}`
+                  "url": `https://rideflow.com/ride-finder?bikeId=${bike.id}`
                 }
               }
             }))
@@ -458,7 +499,7 @@ export default function Garage() {
                 "@type": "ListItem",
                 "position": 2,
                 "name": "Ride Finder",
-                "item": "https://rideflow.com/garage"
+                "item": "https://rideflow.com/ride-finder"
               }
             ]
           }
@@ -518,43 +559,6 @@ export default function Garage() {
                             });
                           }
                           setPickupDate(finalVal);
-                          // If dropoff exceeds 7 days from new pickup date, cap to 7 days
-                          if (finalVal && pickupTime) {
-                            const pickup = getDateTime(finalVal, pickupTime);
-                            if (pickup) {
-                              const maxDrop = new Date(pickup.getTime() + 7 * 24 * 60 * 60000); // 7 days max
-                              const currentDrop = getDateTime(dropoffDate, dropoffTime);
-                              if (currentDrop && currentDrop > maxDrop) {
-                                setDropoffDate(maxDrop.toISOString().slice(0, 10));
-                                setDropoffTime(toHHMM(maxDrop));
-                                toast({
-                                  title: 'Maximum Duration',
-                                  description: 'Booking duration cannot exceed 7 days',
-                                  variant: 'default',
-                                });
-                              }
-                            }
-                          }
-                          if (dropoffDate === finalVal && pickupTime) {
-                            const p = getDateTime(finalVal, pickupTime);
-                            if (p) {
-                              const minDrop = new Date(p.getTime() + 30 * 60000);
-                              const maxDrop = new Date(p.getTime() + 7 * 24 * 60 * 60000); // 7 days max
-                              const currentDrop = getDateTime(dropoffDate, dropoffTime);
-                              if (!currentDrop || currentDrop.getTime() < minDrop.getTime()) {
-                                setDropoffDate(finalVal);
-                                setDropoffTime(toHHMM(minDrop));
-                              } else if (currentDrop.getTime() > maxDrop.getTime()) {
-                                setDropoffDate(finalVal);
-                                setDropoffTime(toHHMM(maxDrop));
-                                toast({
-                                  title: 'Maximum Duration',
-                                  description: 'Booking duration cannot exceed 7 days',
-                                  variant: 'default',
-                                });
-                              }
-                            }
-                          }
                         }}
                         onClick={(e) => e.currentTarget.showPicker?.()}
                         className="w-full cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
@@ -568,31 +572,13 @@ export default function Garage() {
                             t = nowHHMM;
                           }
                           setPickupTime(t);
-                          const p = getDateTime(pickupDate, t);
-                          if (p && dropoffDate === pickupDate) {
-                            const minDrop = new Date(p.getTime() + 30 * 60000);
-                            const maxDrop = new Date(p.getTime() + 12 * 60 * 60000); // 12 hours max
-                            const currentDrop = getDateTime(dropoffDate, dropoffTime);
-                            if (!currentDrop || currentDrop.getTime() < minDrop.getTime()) {
-                              setDropoffDate(pickupDate);
-                              setDropoffTime(toHHMM(minDrop));
-                            } else if (currentDrop.getTime() > maxDrop.getTime()) {
-                              setDropoffDate(pickupDate);
-                              setDropoffTime(toHHMM(maxDrop));
-                              toast({
-                                title: 'Maximum Duration',
-                                description: 'Booking duration cannot exceed 12 hours',
-                                variant: 'default',
-                              });
-                            }
-                          }
                         }}
                       >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Time" />
                         </SelectTrigger>
                         <SelectContent>
-                          {pickupOptions.map((t) => (
+                          {generateTimes(pickupTimeMin).map((t) => (
                             <SelectItem key={t} value={t}>{format12h(t)}</SelectItem>
                           ))}
                         </SelectContent>
@@ -613,27 +599,6 @@ export default function Garage() {
                           const minVal = todayStr;
                           let finalVal = val;
                           if (val < minVal) finalVal = minVal;
-                          
-                          // Check if duration exceeds 7 days
-                          if (pickupDate && pickupTime) {
-                            const pickup = new Date(`${pickupDate}T${pickupTime}`);
-                            const dropoff = new Date(`${val}T${dropoffTime || '23:59'}`);
-                            const hours = (dropoff.getTime() - pickup.getTime()) / (1000 * 60 * 60);
-                            
-                            if (hours > 24 * 7) {
-                              const maxDrop = new Date(pickup);
-                              maxDrop.setDate(maxDrop.getDate() + 7);
-                              finalVal = maxDrop.toISOString().slice(0, 10);
-                              const maxTime = toHHMM(maxDrop);
-                              setDropoffTime(maxTime);
-                              toast({
-                                title: 'Maximum Duration',
-                                description: 'Booking duration cannot exceed 7 days',
-                                variant: 'default',
-                              });
-                            }
-                          }
-                          
                           setDropoffDate(finalVal);
                         }}
                         onClick={(e) => e.currentTarget.showPicker?.()}
@@ -647,23 +612,6 @@ export default function Garage() {
                           if (dropoffDate === todayStr && proposed && proposed.getTime() < now.getTime()) {
                             t = nowHHMM;
                           }
-                          if (pickupDT && dropoffDate === pickupDate) {
-                            const minDrop = new Date(pickupDT.getTime() + 30 * 60000);
-                            if (proposed && proposed.getTime() < minDrop.getTime()) {
-                              t = toHHMM(minDrop);
-                            }
-                          }
-                          if (pickupDT && proposed) {
-                            const maxDrop = new Date(pickupDT.getTime() + 7 * 24 * 60 * 60000);
-                            if (proposed.getTime() > maxDrop.getTime()) {
-                              t = toHHMM(maxDrop);
-                              toast({
-                                title: 'Maximum Duration',
-                                description: 'Booking duration cannot exceed 7 days',
-                                variant: 'default',
-                              });
-                            }
-                          }
                           setDropoffTime(t);
                         }}
                       >
@@ -671,7 +619,7 @@ export default function Garage() {
                           <SelectValue placeholder="Time" />
                         </SelectTrigger>
                         <SelectContent>
-                          {dropoffOptions.map((t) => (
+                          {generateTimes(dropoffTimeMin).map((t) => (
                             <SelectItem key={t} value={t}>{format12h(t)}</SelectItem>
                           ))}
                         </SelectContent>
@@ -760,15 +708,6 @@ export default function Garage() {
               ) : bikesToShow.length > 0 ? (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {bikesToShow.map((bike, index) => {
-                    const durationHours = (() => {
-                      if (pickupDate && pickupTime && dropoffDate && dropoffTime) {
-                        const start = new Date(`${pickupDate}T${pickupTime}`);
-                        const end = new Date(`${dropoffDate}T${dropoffTime}`);
-                        return Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
-                      }
-                      return 0;
-                    })();
-
                     return (
                       <div
                         key={bike.id}
@@ -778,9 +717,11 @@ export default function Garage() {
                         <BikeCard 
                           bike={bike} 
                           onRent={handleRent}
-                          pickupDateTime={pickupDate && pickupTime ? new Date(`${pickupDate}T${pickupTime}`) : undefined}
-                          dropoffDateTime={dropoffDate && dropoffTime ? new Date(`${dropoffDate}T${dropoffTime}`) : undefined}
-                          durationHours={durationHours}
+                          pickupDateTime={pickupDT || undefined}
+                          dropoffDateTime={dropoffDT || undefined}
+                          durationHours={durationMinutes / 60}
+                          docStatus={docStatus}
+                          isLoggedIn={isLoggedIn}
                         />
                       </div>
                     );
@@ -842,23 +783,6 @@ export default function Garage() {
                           });
                         }
                         setPickupDate(finalVal);
-                        // If dropoff exceeds 7 days from new pickup date, cap to 7 days
-                        if (finalVal && pickupTime) {
-                          const pickup = getDateTime(finalVal, pickupTime);
-                          if (pickup) {
-                            const maxDrop = new Date(pickup.getTime() + 7 * 24 * 60 * 60000); // 7 days max
-                            const currentDrop = getDateTime(dropoffDate, dropoffTime);
-                            if (currentDrop && currentDrop > maxDrop) {
-                              setDropoffDate(maxDrop.toISOString().slice(0, 10));
-                              setDropoffTime(toHHMM(maxDrop));
-                              toast({
-                                title: 'Maximum Duration',
-                                description: 'Booking duration cannot exceed 7 days',
-                                variant: 'default',
-                              });
-                            }
-                          }
-                        }
                       }}
                       onClick={(e) => e.currentTarget.showPicker?.()}
                       className="cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
@@ -867,30 +791,13 @@ export default function Garage() {
                       value={pickupTime || undefined}
                       onValueChange={(val) => {
                         setPickupTime(val);
-                        // Update dropoff time if needed to stay within 7 days
-                        if (pickupDate && val && dropoffDate && dropoffTime) {
-                          const pickup = getDateTime(pickupDate, val);
-                          if (pickup) {
-                            const maxDrop = new Date(pickup.getTime() + 7 * 24 * 60 * 60000);
-                            const currentDrop = getDateTime(dropoffDate, dropoffTime);
-                            if (currentDrop && currentDrop > maxDrop) {
-                              setDropoffDate(maxDrop.toISOString().slice(0, 10));
-                              setDropoffTime(toHHMM(maxDrop));
-                              toast({
-                                title: 'Maximum Duration',
-                                description: 'Booking duration cannot exceed 7 days',
-                                variant: 'default',
-                              });
-                            }
-                          }
-                        }
                       }}
                     >
                       <SelectTrigger className="w-40">
                         <SelectValue placeholder="Time" />
                       </SelectTrigger>
                       <SelectContent>
-                        {pickupOptions.map((t) => (
+                        {generateTimes(pickupTimeMin).map((t) => (
                           <SelectItem key={t} value={t}>{format12h(t)}</SelectItem>
                         ))}
                       </SelectContent>
@@ -910,27 +817,6 @@ export default function Garage() {
                           const minVal = todayStr;
                           let finalVal = val;
                           if (val < minVal) finalVal = minVal;
-                          
-                          // Check if duration exceeds 7 days
-                          if (pickupDate && pickupTime) {
-                            const pickup = new Date(`${pickupDate}T${pickupTime}`);
-                            const dropoff = new Date(`${val}T${dropoffTime || '23:59'}`);
-                            const hours = (dropoff.getTime() - pickup.getTime()) / (1000 * 60 * 60);
-                            
-                            if (hours > 24 * 7) {
-                              const maxDrop = new Date(pickup);
-                              maxDrop.setDate(maxDrop.getDate() + 7);
-                              finalVal = maxDrop.toISOString().slice(0, 10);
-                              const maxTime = toHHMM(maxDrop);
-                              setDropoffTime(maxTime);
-                              toast({
-                                title: 'Maximum Duration',
-                                description: 'Booking duration cannot exceed 7 days',
-                                variant: 'default',
-                              });
-                            }
-                          }
-                          
                           setDropoffDate(finalVal);
                         }}
                       onClick={(e) => e.currentTarget.showPicker?.()}
@@ -939,31 +825,14 @@ export default function Garage() {
                     <Select
                       value={dropoffTime || undefined}
                       onValueChange={(val) => {
-                        let t = val;
-                        if (pickupDate && pickupTime) {
-                          const pickup = getDateTime(pickupDate, pickupTime);
-                          const proposed = getDateTime(dropoffDate, t);
-                          if (pickup && proposed) {
-                            const hours = (proposed.getTime() - pickup.getTime()) / (1000 * 60 * 60);
-                            if (hours > 12) {
-                              const maxDrop = new Date(pickup.getTime() + 12 * 60 * 60000);
-                              t = toHHMM(maxDrop);
-                              toast({
-                                title: 'Maximum Duration',
-                                description: 'Booking duration cannot exceed 12 hours',
-                                variant: 'default',
-                              });
-                            }
-                          }
-                        }
-                        setDropoffTime(t);
+                        setDropoffTime(val);
                       }}
                     >
                       <SelectTrigger className="w-40">
                         <SelectValue placeholder="Time" />
                       </SelectTrigger>
                       <SelectContent>
-                        {dropoffOptions.map((t) => (
+                        {generateTimes(dropoffTimeMin).map((t) => (
                           <SelectItem key={t} value={t}>{format12h(t)}</SelectItem>
                         ))}
                       </SelectContent>
@@ -986,28 +855,29 @@ export default function Garage() {
               </DialogHeader>
               {selectedBike && (() => {
                 const availableSlabs = getAvailablePricingSlabs(selectedBike);
-                const start = new Date(`${pickupDate}T${pickupTime}`);
-                const end = new Date(`${dropoffDate}T${dropoffTime}`);
-                const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+                const start = pickupDT;
+                const end = dropoffDT;
+                const hours = durationMinutes / 60;
                 
                 let priceInfo: any = null;
-                try {
-                  // Try new simple pricing model first (same logic as BikeCard)
-                  const hasIndividualRates = [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24].some(
-                    hour => selectedBike[`pricePerHour${hour}` as keyof typeof selectedBike] && Number(selectedBike[`pricePerHour${hour}` as keyof typeof selectedBike]) > 0
-                  );
-                  const hasTariff = selectedBike.weekdayRate !== undefined || selectedBike.weekendRate !== undefined;
-                  
-                  if (selectedBike.price12Hours || hasIndividualRates || selectedBike.pricePerWeek || hasTariff) {
-                    priceInfo = calculateSimplePrice(selectedBike, start, end);
-                  } else {
-                    priceInfo = calculateRentalPrice(selectedBike, start, end, selectedPricingType);
+                if (start && end) {
+                  try {
+                    // Try new simple pricing model first (same logic as BikeCard)
+                    const hasIndividualRates = [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24].some(
+                      hour => selectedBike[`pricePerHour${hour}` as keyof typeof selectedBike] && Number(selectedBike[`pricePerHour${hour}` as keyof typeof selectedBike]) > 0
+                    );
+                    const hasTariff = selectedBike.weekdayRate !== undefined || selectedBike.weekendRate !== undefined;
+                    
+                    if (selectedBike.price12Hours || hasIndividualRates || selectedBike.pricePerWeek || hasTariff) {
+                      priceInfo = calculateSimplePrice(selectedBike, start, end);
+                    } else {
+                      priceInfo = calculateRentalPrice(selectedBike, start, end, selectedPricingType);
+                    }
+                  } catch (error) {
+                    console.error('Price calculation error:', error);
                   }
-                } catch (error) {
-                  console.error('Price calculation error:', error);
                 }
                 const currentSlab = selectedBike.pricingSlabs?.[selectedPricingType];
-                const displayPrice = currentSlab?.price || selectedBike.pricePerHour || 0;
                 // Display static kmLimit value (not calculated includedKm) for user visibility
                 const displayKmLimit = selectedBike.kmLimit || currentSlab?.included_km || 0;
 
