@@ -60,7 +60,7 @@ export default function Payment() {
 
   useEffect(() => {
     if (!bookingDetails) {
-      navigate('/garage');
+      navigate('/ride-finder');
       return;
     }
     const user = getCurrentUser();
@@ -74,24 +74,17 @@ export default function Payment() {
     const checkDocuments = async () => {
       try {
         const userDocs = await documentsAPI.getAll();
-        const hasDocuments = userDocs && userDocs.length > 0;
-        const allApproved = hasDocuments && userDocs.every((doc: any) => doc.status === 'approved');
+        const requiredTypes = ['aadhar_front', 'aadhar_back', 'pan', 'driving_license'];
+        const approvedTypes = (userDocs || [])
+          .filter((doc: any) => doc.status === 'approved')
+          .map((doc: any) => doc.type);
         
-        if (!hasDocuments) {
+        const allVerified = requiredTypes.every(type => approvedTypes.includes(type));
+        
+        if (!allVerified) {
           toast({ 
-            title: 'Documents Required', 
-            description: 'Please upload and verify all required documents before booking a ride.', 
-            variant: 'destructive' 
-          });
-          navigate('/dashboard?tab=documents');
-          return;
-        }
-
-        if (!allApproved) {
-          const pendingCount = userDocs.filter((doc: any) => doc.status !== 'approved').length;
-          toast({ 
-            title: 'Documents Pending Verification', 
-            description: `You have ${pendingCount} document(s) pending verification. Please wait for admin approval before booking.`, 
+            title: 'Verification Required', 
+            description: 'All documents must be uploaded and verified before booking a ride.', 
             variant: 'destructive' 
           });
           navigate('/dashboard?tab=documents');
@@ -103,7 +96,7 @@ export default function Payment() {
           description: 'Failed to verify documents. Please try again.', 
           variant: 'destructive' 
         });
-        navigate('/garage');
+        navigate('/ride-finder');
       }
     };
 

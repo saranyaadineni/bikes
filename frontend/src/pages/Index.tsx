@@ -250,12 +250,12 @@ export default function Index() {
               <div className="flex flex-wrap gap-4">
                 <Link to="/ride-finder">
                   <Button size="lg" className="h-14 px-8 text-lg font-semibold shadow-hero">
-                    Browse Bikes
+                    Ride Finder
                   </Button>
                 </Link>
                 <Link to="/garage">
                   <Button variant="outline" size="lg" className="h-14 px-8 text-lg font-semibold bg-background/50 backdrop-blur-sm">
-                    View Tariffs
+                    Garage
                   </Button>
                 </Link>
               </div>

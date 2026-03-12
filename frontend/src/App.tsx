@@ -15,7 +15,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Admin = lazy(() => import("./pages/Admin"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Tariff = lazy(() => import("./pages/Tariff"));
+const RideFinder = lazy(() => import("./pages/RideFinder"));
 const Payment = lazy(() => import("./pages/Payment"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const ActiveRide = lazy(() => import("./pages/ActiveRide"));
@@ -56,8 +56,8 @@ const App = () => (
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/ride-finder" element={<Tariff />} />
               <Route path="/garage" element={<Garage />} />
+              <Route path="/ride-finder" element={<RideFinder />} />
               <Route path="/payment" element={<Payment />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/active-ride" element={<ActiveRide />} />

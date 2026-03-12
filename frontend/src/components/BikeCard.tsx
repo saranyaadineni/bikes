@@ -215,9 +215,8 @@ export const BikeCard = memo(({ bike, onRent, variant = 'grid', pickupDateTime, 
           <Button
             className="w-full"
             variant={bike.available ? 'default' : 'secondary'}
-            disabled={!bike.available || (isLoggedIn && !docStatus?.allApproved)}
+            disabled={!bike.available}
             onClick={() => onRent?.(bike, selectedPricingType)}
-            title={isLoggedIn && !docStatus?.allApproved ? "Please upload and get your documents approved to book a ride." : ""}
           >
             {!isLoggedIn ? 'Login to Book' : !docStatus?.allApproved ? 'Documents not verified' : bike.available ? 'Rent Now' : 'Not Available'}
           </Button>
@@ -339,9 +338,8 @@ export const BikeCard = memo(({ bike, onRent, variant = 'grid', pickupDateTime, 
           <Button
             className={priceInfo || (durationHours && durationHours > 0) ? "flex-1" : "w-full"}
             variant={bike.available ? 'default' : 'secondary'}
-            disabled={!bike.available || (isLoggedIn && !docStatus?.allApproved)}
+            disabled={!bike.available}
             onClick={() => onRent?.(bike, selectedPricingType)}
-            title={isLoggedIn && !docStatus?.allApproved ? "Please upload and get your documents approved to book a ride." : ""}
           >
             {!isLoggedIn ? 'Login to Book' : !docStatus?.allApproved ? 'Documents not verified' : bike.available ? 'Rent Now' : 'Not Available'}
           </Button>

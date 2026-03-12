@@ -150,7 +150,7 @@ router.post('/', authenticateToken, async (req, res) => {
     const allDocsApproved = requiredDocs.every(type => approvedDocTypes.includes(type));
 
     if (!allDocsApproved) {
-      return res.status(403).json({ message: 'Please upload and get all required documents approved before booking.' });
+      return res.status(403).json({ message: 'All documents must be uploaded and verified before booking a ride.' });
     }
 
     // Check if user has active/confirmed rental

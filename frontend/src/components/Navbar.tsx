@@ -201,13 +201,13 @@ export const Navbar = memo(function Navbar() {
   const navLinks = useMemo(() => isSuperAdmin
     ? [
         { path: '/', label: 'Home' },
-        { path: '/garage', label: 'Garage' },
+        { path: '/ride-finder', label: 'Ride Finder' },
         { path: '/dashboard', label: 'Dashboard' },
       ]
     : [
         { path: '/', label: 'Home' },
-        { path: '/ride-finder', label: 'Ride Finder' },
         { path: '/garage', label: 'Garage' },
+        { path: '/ride-finder', label: 'Ride Finder' },
         { path: '/about', label: 'About Us' },
         { path: '/contact', label: 'Contact Us' },
         { path: '/faq', label: 'FAQ' },
