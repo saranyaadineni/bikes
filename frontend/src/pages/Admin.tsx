@@ -1127,12 +1127,14 @@ export default function Admin() {
                             variant="destructive"
                             className="h-7 px-2 text-xs"
                             onClick={async () => {
-                              try {
-                                await bikesAPI.delete(bike.id);
-                                toast({ title: 'Vehicle deleted' });
-                                loadData();
-                              } catch (e: any) {
-                                toast({ title: 'Error', description: e.message || 'Failed to delete vehicle', variant: 'destructive' });
+                              if (window.confirm(`Are you sure you want to delete ${bike.name}? This action cannot be undone.`)) {
+                                try {
+                                  await bikesAPI.delete(bike.id);
+                                  toast({ title: 'Vehicle deleted' });
+                                  loadData();
+                                } catch (e: any) {
+                                  toast({ title: 'Error', description: e.message || 'Failed to delete vehicle', variant: 'destructive' });
+                                }
                               }
                             }}
                           >
