@@ -53,19 +53,13 @@ export function HeroCarousel({ images }: HeroCarouselProps) {
                {/* Background Image */}
                <img 
                  src={image.imageUrl}
-                 alt={image.title || "Premium Bike Rental Service - RideFlow"}
+                 alt="Premium Bike Rental Service - RideFlow"
                  loading={index === 0 ? "eager" : "lazy"}
                  fetchPriority={index === 0 ? "high" : "low"}
                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-500"
                />
                {/* Overlay - lighter opacity to show images better */}
                <div className="absolute inset-0 bg-background/40 backdrop-blur-[0px]" />
-               
-               {/* Content - Optional, if we want to show title/subtitle over the slide */}
-               {(image.title || image.subtitle) && (
-                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white p-4">
-                 </div>
-               )}
             </div>
           ))}
         </div>

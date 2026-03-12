@@ -23,8 +23,6 @@ export function HeroImageManager() {
   const [isUploading, setIsUploading] = useState(false);
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
-  const [newImageTitle, setNewImageTitle] = useState('');
-  const [newImageSubtitle, setNewImageSubtitle] = useState('');
   const { toast } = useToast();
 
   const loadImages = async () => {
@@ -67,8 +65,8 @@ export function HeroImageManager() {
       // 2. Create hero image record
       await heroImagesAPI.create({
         imageUrl: uploadRes.imageUrl,
-        title: newImageTitle,
-        subtitle: newImageSubtitle,
+        title: '',
+        subtitle: '',
         order: images.length, // Append to end
         isActive: true
       });
@@ -78,8 +76,6 @@ export function HeroImageManager() {
       // Reset form
       setNewImageFile(null);
       setNewImagePreview(null);
-      setNewImageTitle('');
-      setNewImageSubtitle('');
       
       // Reload list
       loadImages();
@@ -146,7 +142,7 @@ export function HeroImageManager() {
             <div className="aspect-video relative bg-muted">
               <img 
                 src={image.imageUrl} 
-                alt={image.title || 'RideFlow Hero Carousel Image'} 
+                alt="RideFlow Hero Carousel Image" 
                 className={`w-full h-full object-cover transition-opacity ${!image.isActive ? 'opacity-50 grayscale' : ''}`}
               />
               <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 p-1 rounded-lg">
@@ -179,11 +175,6 @@ export function HeroImageManager() {
                      onChange={(e) => handleOrderChange(image.id, parseInt(e.target.value))}
                    />
                 </div>
-              </div>
-              
-              <div className="space-y-1">
-                <p className="font-medium text-sm truncate">{image.title || <span className="text-muted-foreground italic">No title</span>}</p>
-                <p className="text-xs text-muted-foreground truncate">{image.subtitle || <span className="text-muted-foreground italic">No subtitle</span>}</p>
               </div>
             </div>
           </div>
@@ -226,20 +217,6 @@ export function HeroImageManager() {
                  >
                    <Trash2 className="h-3 w-3" />
                  </Button>
-               </div>
-               <div className="space-y-2">
-                 <Input 
-                   placeholder="Title (optional)" 
-                   value={newImageTitle} 
-                   onChange={(e) => setNewImageTitle(e.target.value)}
-                   className="h-8 text-sm"
-                 />
-                 <Input 
-                   placeholder="Subtitle (optional)" 
-                   value={newImageSubtitle} 
-                   onChange={(e) => setNewImageSubtitle(e.target.value)}
-                   className="h-8 text-sm"
-                 />
                </div>
                <Button 
                  className="w-full" 
