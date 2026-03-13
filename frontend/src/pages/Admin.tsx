@@ -284,11 +284,46 @@ export default function Admin() {
 
   const handleEndRideSubmit = async () => {
     if (isEnding) return;
+    
+    // Validation for KM readings
+    if (!endRideData.startKm || !endRideData.endKm) {
+      toast({
+        title: "Validation Error",
+        description: "Starting Ride (km) and Ending Ride (km) fields are empty",
+        variant: "destructive",
+      });
+      setSlideValue(0); // Reset slider
+      return;
+    }
+
+    const startVal = parseFloat(endRideData.startKm);
+    const endVal = parseFloat(endRideData.endKm);
+
+    if (isNaN(startVal) || isNaN(endVal)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter valid numbers for KM readings",
+        variant: "destructive",
+      });
+      setSlideValue(0);
+      return;
+    }
+
+    if (endVal < startVal) {
+      toast({
+        title: "Validation Error",
+        description: "Ending Ride (km) cannot be less than Starting Ride (km)",
+        variant: "destructive",
+      });
+      setSlideValue(0);
+      return;
+    }
+
     setIsEnding(true);
     try {
       // Calculate total price from distance and delay
-      const startKm = parseFloat(endRideData.startKm);
-      const endKm = parseFloat(endRideData.endKm);
+      const startKm = startVal;
+      const endKm = endVal;
       const delayHours = parseFloat(endRideData.delay);
       const bike = bikesById[endRideData.bikeId];
       
@@ -310,10 +345,10 @@ export default function Admin() {
       const calculatedTotalPrice = distancePrice + delayPrice;
       
       await rentalsAPI.completeRide(endRideData.id, {
-        startKm: parseFloat(endRideData.startKm),
-        endKm: parseFloat(endRideData.endKm),
+        startKm: startVal,
+        endKm: endVal,
         // UI uses hours; backend stores delay as a number (historically minutes).
-        delay: (parseFloat(endRideData.delay) || 0) * 60,
+        delay: (delayHours || 0) * 60,
         totalCost: calculatedTotalPrice
       });
       toast({ title: "Ride Ended", description: "Booking closed successfully." });
