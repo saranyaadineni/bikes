@@ -198,8 +198,8 @@ export const documentsAPI = {
       throw handleApiError(error);
     }
   },
-  updateStatus: (id: string, status: 'pending' | 'approved' | 'rejected') =>
-    apiRequest<any>(`/documents/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
+  updateStatus: (id: string, status: 'pending' | 'approved' | 'rejected', reason?: string) =>
+    apiRequest<any>(`/documents/${id}/status`, { method: 'PUT', body: JSON.stringify({ status, reason }) }),
 };
 
 export const paymentsAPI = {

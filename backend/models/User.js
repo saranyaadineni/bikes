@@ -6,6 +6,7 @@ const documentSchema = new mongoose.Schema({
   type: { type: String, enum: ['aadhar_front', 'aadhar_back', 'pan', 'driving_license', 'license', 'id', 'other'], required: true },
   url: { type: String, required: true },
   status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  rejectionReason: { type: String, default: null },
   uploadedAt: { type: Date, default: Date.now }
 }, { _id: true });
 

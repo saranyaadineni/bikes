@@ -53,6 +53,7 @@ router.get('/', authenticateToken, async (req, res) => {
               type: doc.type,
               url: doc.url,
               status: doc.status,
+              rejectionReason: doc.rejectionReason,
               uploadedAt: doc.uploadedAt,
               userId: user._id.toString(),
               userName: user.name,
@@ -171,7 +172,7 @@ router.post('/', authenticateToken, async (req, res) => {
 // Update document status (superadmin only)
 router.put('/:id/status', authenticateToken, async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, reason } = req.body;
 
     if (!['pending', 'approved', 'rejected'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
@@ -190,6 +191,14 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
 
     const doc = user.documents.id(req.params.id);
     doc.status = status;
+    
+    // Add rejection reason if status is rejected
+    if (status === 'rejected') {
+      doc.rejectionReason = reason || 'No reason provided';
+    } else if (status === 'approved') {
+      doc.rejectionReason = null; // Clear reason if approved later
+    }
+
     await user.save();
 
     res.json(doc);

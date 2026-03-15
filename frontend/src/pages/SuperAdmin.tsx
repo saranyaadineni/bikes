@@ -52,6 +52,7 @@ import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Textarea } from '@/components/ui/textarea';
 
 const statusStyles = {
   verified: { color: 'bg-accent/10 text-accent', icon: CheckCircle },
@@ -118,6 +119,9 @@ export default function SuperAdmin() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
     const [zoomScale, setZoomScale] = useState(1);
+    const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [docToReject, setDocToReject] = useState<string | null>(null);
     const [bikeForm, setBikeForm] = useState<any>({ 
       name: '', 
       brand: '', 
@@ -434,15 +438,52 @@ export default function SuperAdmin() {
   );
 
   const handleDocumentAction = async (docId: string, action: 'approve' | 'reject') => {
+    if (action === 'reject') {
+      setDocToReject(docId);
+      setRejectionReason('');
+      setIsRejectionModalOpen(true);
+      return;
+    }
+
     try {
-      await documentsAPI.updateStatus(docId, action === 'approve' ? 'approved' : 'rejected');
-      toast({ title: 'Updated', description: `Document ${action}d` });
+      await documentsAPI.updateStatus(docId, 'approved');
+      toast({ title: 'Updated', description: `Document approved` });
       loadData();
     } catch (error: any) {
       toast({ 
         title: 'Error', 
-        description: error.message || `Failed to ${action} document`,
+        description: error.message || `Failed to approve document`,
         variant: 'destructive'
+      });
+    }
+  };
+
+  const confirmRejection = async () => {
+    if (!docToReject) return;
+    if (!rejectionReason.trim()) {
+      toast({
+        title: "Reason Required",
+        description: "Please enter a reason for rejection",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await documentsAPI.updateStatus(docToReject, 'rejected', rejectionReason);
+      toast({
+        title: "Document Rejected",
+        description: 'Document status updated successfully.',
+      });
+      setIsRejectionModalOpen(false);
+      setDocToReject(null);
+      setRejectionReason('');
+      loadData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reject document",
+        variant: "destructive",
       });
     }
   };
@@ -1556,6 +1597,11 @@ export default function SuperAdmin() {
                               </div>
                               <p className="text-xs font-medium mb-1 truncate">{doc.type.replace('_', ' ')}</p>
                               <p className="text-xs text-muted-foreground mb-2 truncate">{doc.name}</p>
+                              {doc.status === 'rejected' && doc.rejectionReason && (
+                                <div className="mb-2 px-1 py-0.5 bg-destructive/5 border border-destructive/10 rounded text-[9px] text-destructive italic truncate" title={doc.rejectionReason}>
+                                  Reason: {doc.rejectionReason}
+                                </div>
+                              )}
                               {/* Document Preview */}
                               <div 
                                 className="mb-2 border rounded overflow-hidden bg-background cursor-pointer hover:bg-muted/50 transition-colors"
@@ -2098,6 +2144,12 @@ export default function SuperAdmin() {
                           </Badge>
                         </div>
                         
+                        {doc.status === 'rejected' && doc.rejectionReason && (
+                          <div className="mb-2 px-2 py-1 bg-destructive/5 border border-destructive/10 rounded text-[10px] text-destructive">
+                            <span className="font-semibold">Reason:</span> {doc.rejectionReason}
+                          </div>
+                        )}
+                        
                         {/* Document Preview */}
                         <div 
                           className="mb-2 sm:mb-3 border rounded-lg overflow-hidden bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
@@ -2233,6 +2285,38 @@ export default function SuperAdmin() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Rejection Reason Dialog */}
+      <Dialog open={isRejectionModalOpen} onOpenChange={setIsRejectionModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rejection Reason</DialogTitle>
+            <DialogDescription>
+              Please provide a reason why this document is being rejected. This will be visible to the user.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="reason">Reason</Label>
+              <Textarea 
+                id="reason"
+                placeholder="e.g. Image is blurry, Document is expired, etc."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setIsRejectionModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmRejection}>
+              Confirm Rejection
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

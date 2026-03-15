@@ -495,11 +495,16 @@ export default function Dashboard() {
                                     </a>
                                   </div>
                                 )}
-                                <div className="absolute top-2 right-2">
+                                <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
                                   <Badge className={`${statusStyles[doc.status as keyof typeof statusStyles].color} text-[10px] px-1 py-0 h-5`}>
                                     <StatusIcon className="h-3 w-3 mr-1" />
                                     <span className="hidden sm:inline">{doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}</span>
                                   </Badge>
+                                  {doc.status === 'rejected' && doc.rejectionReason && (
+                                    <Badge variant="outline" className="bg-destructive/5 text-destructive border-destructive/20 text-[9px] px-1 py-0 leading-tight max-w-[120px] text-right">
+                                      {doc.rejectionReason}
+                                    </Badge>
+                                  )}
                                 </div>
                               </div>
                               <div className="p-3 sm:p-4 flex items-center justify-between mt-auto">
@@ -792,14 +797,22 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                           <Label>Aadhar Card - Front</Label>
                           {(() => {
-                            const status = getDocStatus('aadhar_front') as 'approved' | 'pending' | 'rejected' | 'none';
+                            const doc = getLatestDoc('aadhar_front');
+                            const status = doc?.status || 'none';
                             if (status === 'none') return null;
                             const StatusIcon = statusStyles[status as keyof typeof statusStyles]?.icon || Clock;
                             return (
-                              <Badge className={statusStyles[status as keyof typeof statusStyles]?.color || 'bg-muted'}>
-                                <StatusIcon className="h-3 w-3 mr-1" />
-                                {status === 'approved' ? 'Accepted' : status.charAt(0).toUpperCase() + status.slice(1)}
-                              </Badge>
+                              <div className="flex flex-col items-end gap-1">
+                                <Badge className={statusStyles[status as keyof typeof statusStyles]?.color || 'bg-muted'}>
+                                  <StatusIcon className="h-3 w-3 mr-1" />
+                                  {status === 'approved' ? 'Accepted' : status.charAt(0).toUpperCase() + status.slice(1)}
+                                </Badge>
+                                {status === 'rejected' && doc?.rejectionReason && (
+                                  <span className="text-[10px] text-destructive font-medium bg-destructive/5 px-1 rounded border border-destructive/10 max-w-[150px] truncate" title={doc.rejectionReason}>
+                                    Reason: {doc.rejectionReason}
+                                  </span>
+                                )}
+                              </div>
                             );
                           })()}
                         </div>
@@ -850,14 +863,22 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                           <Label>Aadhar Card - Back</Label>
                           {(() => {
-                            const status = getDocStatus('aadhar_back') as 'approved' | 'pending' | 'rejected' | 'none';
+                            const doc = getLatestDoc('aadhar_back');
+                            const status = doc?.status || 'none';
                             if (status === 'none') return null;
                             const StatusIcon = statusStyles[status as keyof typeof statusStyles]?.icon || Clock;
                             return (
-                              <Badge className={statusStyles[status as keyof typeof statusStyles]?.color || 'bg-muted'}>
-                                <StatusIcon className="h-3 w-3 mr-1" />
-                                {status === 'approved' ? 'Accepted' : status.charAt(0).toUpperCase() + status.slice(1)}
-                              </Badge>
+                              <div className="flex flex-col items-end gap-1">
+                                <Badge className={statusStyles[status as keyof typeof statusStyles]?.color || 'bg-muted'}>
+                                  <StatusIcon className="h-3 w-3 mr-1" />
+                                  {status === 'approved' ? 'Accepted' : status.charAt(0).toUpperCase() + status.slice(1)}
+                                </Badge>
+                                {status === 'rejected' && doc?.rejectionReason && (
+                                  <span className="text-[10px] text-destructive font-medium bg-destructive/5 px-1 rounded border border-destructive/10 max-w-[150px] truncate" title={doc.rejectionReason}>
+                                    Reason: {doc.rejectionReason}
+                                  </span>
+                                )}
+                              </div>
                             );
                           })()}
                         </div>
@@ -912,14 +933,22 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                           <Label>PAN Card</Label>
                           {(() => {
-                            const status = getDocStatus('pan') as 'approved' | 'pending' | 'rejected' | 'none';
+                            const doc = getLatestDoc('pan');
+                            const status = doc?.status || 'none';
                             if (status === 'none') return null;
                             const StatusIcon = statusStyles[status as keyof typeof statusStyles]?.icon || Clock;
                             return (
-                              <Badge className={statusStyles[status as keyof typeof statusStyles]?.color || 'bg-muted'}>
-                                <StatusIcon className="h-3 w-3 mr-1" />
-                                {status === 'approved' ? 'Accepted' : status.charAt(0).toUpperCase() + status.slice(1)}
-                              </Badge>
+                              <div className="flex flex-col items-end gap-1">
+                                <Badge className={statusStyles[status as keyof typeof statusStyles]?.color || 'bg-muted'}>
+                                  <StatusIcon className="h-3 w-3 mr-1" />
+                                  {status === 'approved' ? 'Accepted' : status.charAt(0).toUpperCase() + status.slice(1)}
+                                </Badge>
+                                {status === 'rejected' && doc?.rejectionReason && (
+                                  <span className="text-[10px] text-destructive font-medium bg-destructive/5 px-1 rounded border border-destructive/10 max-w-[150px] truncate" title={doc.rejectionReason}>
+                                    Reason: {doc.rejectionReason}
+                                  </span>
+                                )}
+                              </div>
                             );
                           })()}
                         </div>
@@ -970,14 +999,22 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                           <Label>Driving License</Label>
                           {(() => {
-                            const status = getDocStatus('driving_license') as 'approved' | 'pending' | 'rejected' | 'none';
+                            const doc = getLatestDoc('driving_license');
+                            const status = doc?.status || 'none';
                             if (status === 'none') return null;
                             const StatusIcon = statusStyles[status as keyof typeof statusStyles]?.icon || Clock;
                             return (
-                              <Badge className={statusStyles[status as keyof typeof statusStyles]?.color || 'bg-muted'}>
-                                <StatusIcon className="h-3 w-3 mr-1" />
-                                {status === 'approved' ? 'Accepted' : status.charAt(0).toUpperCase() + status.slice(1)}
-                              </Badge>
+                              <div className="flex flex-col items-end gap-1">
+                                <Badge className={statusStyles[status as keyof typeof statusStyles]?.color || 'bg-muted'}>
+                                  <StatusIcon className="h-3 w-3 mr-1" />
+                                  {status === 'approved' ? 'Accepted' : status.charAt(0).toUpperCase() + status.slice(1)}
+                                </Badge>
+                                {status === 'rejected' && doc?.rejectionReason && (
+                                  <span className="text-[10px] text-destructive font-medium bg-destructive/5 px-1 rounded border border-destructive/10 max-w-[150px] truncate" title={doc.rejectionReason}>
+                                    Reason: {doc.rejectionReason}
+                                  </span>
+                                )}
+                              </div>
                             );
                           })()}
                         </div>
