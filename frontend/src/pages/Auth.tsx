@@ -47,6 +47,22 @@ export default function Auth() {
     return null;
   };
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) return "Email is required";
+    if (email.length > 100) return "Email is too long (max 100 characters)";
+    if (!emailRegex.test(email)) return "Please enter a valid email address (e.g., user@example.com)";
+    return null;
+  };
+
+  const validateName = (name: string) => {
+    if (!name) return "Full name is required";
+    if (name.length < 2) return "Name is too short";
+    if (name.length > 50) return "Name is too long (max 50 characters)";
+    if (!/^[a-zA-Z\s]*$/.test(name)) return "Name should only contain alphabets and spaces";
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -79,8 +95,9 @@ export default function Auth() {
           setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
         } else {
           // Request Reset
-          if (!formData.email) {
-            toast({ title: "Error", description: "Please enter your email", variant: "destructive" });
+          const emailError = validateEmail(formData.email);
+          if (emailError) {
+            toast({ title: "Error", description: emailError, variant: "destructive" });
             return;
           }
           const res = await authAPI.forgotPassword(formData.email);
@@ -101,31 +118,34 @@ export default function Auth() {
     }
 
     // Normal Login/Signup Flow
-    // Basic validation
-    if (!formData.email || !formData.password) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
+    // Email Validation
+    const emailError = validateEmail(formData.email);
+    if (emailError) {
+      toast({ title: "Error", description: emailError, variant: "destructive" });
       return;
     }
 
-    if (!isLogin && !formData.name) {
-      toast({
-        title: "Error",
-        description: "Please enter your name.",
-        variant: "destructive",
-      });
-      return;
+    // Name Validation - Only for Signup
+    if (!isLogin) {
+      const nameError = validateName(formData.name);
+      if (nameError) {
+        toast({ title: "Error", description: nameError, variant: "destructive" });
+        return;
+      }
     }
 
+    // Password Validation - Only for Signup
     if (!isLogin) {
       const passwordError = validatePassword(formData.password);
       if (passwordError) {
         toast({ title: "Weak Password", description: passwordError, variant: "destructive" });
         return;
       }
+    }
+
+    if (!formData.password) {
+      toast({ title: "Error", description: "Password is required", variant: "destructive" });
+      return;
     }
 
     setIsLoading(true);
@@ -227,7 +247,13 @@ export default function Auth() {
                   type="email"
                   placeholder="you@example.com"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value.toLowerCase().trim();
+                    if (value.length <= 100) {
+                      setFormData({ ...formData, email: value });
+                    }
+                  }}
+                  maxLength={100}
                   disabled={isResetting}
                   required
                 />
@@ -382,7 +408,13 @@ export default function Auth() {
                     type="email"
                     placeholder="you@example.com"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value.toLowerCase().trim();
+                      if (value.length <= 100) {
+                        setFormData({ ...formData, email: value });
+                      }
+                    }}
+                    maxLength={100}
                     required
                   />
                 </div>

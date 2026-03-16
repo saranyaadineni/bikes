@@ -290,10 +290,14 @@ export default function Admin() {
     if (isEnding) return;
     
     // Validation for KM readings
-    if (!endRideData.startKm || !endRideData.endKm) {
+    const missingKmFields = [];
+    if (!endRideData.startKm) missingKmFields.push('Starting Ride (km)');
+    if (!endRideData.endKm) missingKmFields.push('Ending Ride (km)');
+
+    if (missingKmFields.length > 0) {
       toast({
         title: "Validation Error",
-        description: "Starting Ride (km) and Ending Ride (km) fields are empty",
+        description: `${missingKmFields.join(' and ')} ${missingKmFields.length > 1 ? 'fields are empty' : 'field is empty'}`,
         variant: "destructive",
       });
       setSlideValue(0); // Reset slider

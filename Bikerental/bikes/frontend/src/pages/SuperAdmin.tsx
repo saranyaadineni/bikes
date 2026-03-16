@@ -314,6 +314,34 @@ export default function SuperAdmin() {
     }
   };
 
+  const validateEmail = (email: string) => {
+    if (!email) return "Email is required";
+    if (email.length > 100) return "Email must not exceed 100 characters";
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return "Please enter a valid email address";
+    return null;
+  };
+
+  const validateName = (name: string) => {
+    if (!name.trim()) return "Full name is required";
+    if (name.length > 50) return "Full name must not exceed 50 characters";
+    if (!/^[a-zA-Z\s]+$/.test(name)) return "Full name must contain only alphabets and spaces";
+    return null;
+  };
+
+  const validatePassword = (password: string) => {
+    if (!password) return "Password is required";
+    if (password.length < 8) return "Password must be at least 8 characters long";
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
+      return "Password must include uppercase, lowercase, number, and special characters";
+    }
+    return null;
+  };
+
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to logout?")) {
       authAPI.logout();
@@ -930,8 +958,23 @@ export default function SuperAdmin() {
                   <DialogDescription>Provision a new admin account.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
-                  <Input placeholder="Full Name" value={newAdminForm.name} onChange={(e) => setNewAdminForm({ ...newAdminForm, name: e.target.value })} />
-                  <Input placeholder="Email" value={newAdminForm.email} onChange={(e) => setNewAdminForm({ ...newAdminForm, email: e.target.value })} />
+                  <Input 
+                    placeholder="Full Name" 
+                    value={newAdminForm.name} 
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (/^[a-zA-Z\s]*$/.test(value) && value.length <= 50) {
+                        setNewAdminForm({ ...newAdminForm, name: value });
+                      }
+                    }}
+                    maxLength={50}
+                  />
+                  <Input 
+                    placeholder="Email" 
+                    value={newAdminForm.email} 
+                    onChange={(e) => setNewAdminForm({ ...newAdminForm, email: e.target.value.toLowerCase().trim() })} 
+                    maxLength={100} 
+                  />
                   <Input type="password" placeholder="Password" value={newAdminForm.password} onChange={(e) => setNewAdminForm({ ...newAdminForm, password: e.target.value })} />
                   <Input
                     type="password"
@@ -985,11 +1028,40 @@ export default function SuperAdmin() {
                     <Button
                       onClick={async () => {
                         try {
-                          if (!newAdminForm.name || !newAdminForm.email || !newAdminForm.password) {
-                            throw new Error('Name, email, and password are required');
+                          const missingFields = [];
+                          if (!newAdminForm.name) missingFields.push('name');
+                          if (!newAdminForm.email) missingFields.push('email');
+                          if (!newAdminForm.password) missingFields.push('password');
+
+                          if (missingFields.length > 0) {
+                            const message = missingFields.map(f => f.charAt(0).toUpperCase() + f.slice(1)).join(', ') + 
+                              (missingFields.length > 1 ? ' are required' : ' is required');
+                            toast({ title: 'Error', description: message, variant: 'destructive' });
+                            return;
                           }
+
+                          // If all filled, validate format/strength
+                          const nameError = validateName(newAdminForm.name);
+                          if (nameError) {
+                            toast({ title: 'Validation Error', description: nameError, variant: 'destructive' });
+                            return;
+                          }
+
+                          const emailError = validateEmail(newAdminForm.email);
+                          if (emailError) {
+                            toast({ title: 'Validation Error', description: emailError, variant: 'destructive' });
+                            return;
+                          }
+
+                          const passwordError = validatePassword(newAdminForm.password);
+                          if (passwordError) {
+                            toast({ title: 'Validation Error', description: passwordError, variant: 'destructive' });
+                            return;
+                          }
+
                           if (newAdminForm.password !== newAdminForm.confirmPassword) {
-                            throw new Error('Passwords do not match');
+                            toast({ title: 'Validation Error', description: 'Passwords do not match', variant: 'destructive' });
+                            return;
                           }
                           const targetCityRaw =
                             newAdminCity === '__other__' ? newAdminOtherCity.trim() : String(newAdminCity || '').trim();
@@ -1061,8 +1133,23 @@ export default function SuperAdmin() {
                   <DialogDescription>Update admin account details.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
-                  <Input placeholder="Full Name" value={editAdminForm.name} onChange={(e) => setEditAdminForm({ ...editAdminForm, name: e.target.value })} />
-                  <Input placeholder="Email" value={editAdminForm.email} onChange={(e) => setEditAdminForm({ ...editAdminForm, email: e.target.value })} />
+                  <Input 
+                    placeholder="Full Name" 
+                    value={editAdminForm.name} 
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (/^[a-zA-Z\s]*$/.test(value) && value.length <= 50) {
+                        setEditAdminForm({ ...editAdminForm, name: value });
+                      }
+                    }}
+                    maxLength={50}
+                  />
+                  <Input 
+                    placeholder="Email" 
+                    value={editAdminForm.email} 
+                    onChange={(e) => setEditAdminForm({ ...editAdminForm, email: e.target.value.toLowerCase().trim() })} 
+                    maxLength={100} 
+                  />
                   <Input
                     type="password"
                     placeholder="New Password"
@@ -1108,6 +1195,28 @@ export default function SuperAdmin() {
                       onClick={async () => {
                         if (!editingAdmin) return;
                         try {
+                          const missingFields = [];
+                          if (!editAdminForm.name) missingFields.push('name');
+                          if (!editAdminForm.email) missingFields.push('email');
+
+                          if (missingFields.length > 0) {
+                            const message = missingFields.map(f => f.charAt(0).toUpperCase() + f.slice(1)).join(', ') + 
+                              (missingFields.length > 1 ? ' are required' : ' is required');
+                            toast({ title: 'Error', description: message, variant: 'destructive' });
+                            return;
+                          }
+
+                          const nameError = validateName(editAdminForm.name);
+                          if (nameError) {
+                            toast({ title: 'Validation Error', description: nameError, variant: 'destructive' });
+                            return;
+                          }
+
+                          const emailError = validateEmail(editAdminForm.email);
+                          if (emailError) {
+                            toast({ title: 'Validation Error', description: emailError, variant: 'destructive' });
+                            return;
+                          }
                           let locationId = editAdminForm.locationId;
 
                           // Handle new location creation when "Other" is selected
@@ -1153,12 +1262,13 @@ export default function SuperAdmin() {
                           
                           // If password is provided, validate it
                           if (editAdminForm.password && editAdminForm.password.trim()) {
-                            if (editAdminForm.password.trim().length < 6) {
-                              toast({ title: 'Error', description: 'Password must be at least 6 characters long', variant: 'destructive' });
+                            const passwordError = validatePassword(editAdminForm.password);
+                            if (passwordError) {
+                              toast({ title: 'Validation Error', description: passwordError, variant: 'destructive' });
                               return;
                             }
                             if (editAdminForm.password !== editAdminForm.confirmPassword) {
-                              toast({ title: 'Error', description: 'Passwords do not match', variant: 'destructive' });
+                              toast({ title: 'Validation Error', description: 'Passwords do not match', variant: 'destructive' });
                               return;
                             }
                             payload.password = editAdminForm.password.trim();
