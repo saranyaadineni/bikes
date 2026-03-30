@@ -1,7 +1,11 @@
 import dotenv from 'dotenv';
 dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import winston from 'winston';
 import connectDB from './config/database.js';
 import authRoutes from './routes/auth.js';
 import bikeRoutes from './routes/bikes.js';
@@ -17,40 +21,81 @@ import { initCronJobs } from './utils/cron.js';
 
 const app = express();
 
-/* =====================================
-   ✅ IMPORTANT FOR RENDER
-===================================== */
+// =====================================
+// ✅ LOGGER
+// =====================================
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'combined.log' }),
+  ],
+});
+
+if (process.env.NODE_ENV !== 'production') {
+  logger.add(new winston.transports.Console({
+    format: winston.format.simple(),
+  }));
+}
+
+// =====================================
+// ✅ IMPORTANT FOR RENDER
+// =====================================
 const PORT = process.env.PORT || 3000;
 
-/* =====================================
-   ✅ CONNECT DATABASE
-===================================== */
+// =====================================
+// ✅ CONNECT DATABASE
+// =====================================
 connectDB();
 
-/* =====================================
-   ✅ INIT CRON JOBS
-===================================== */
+// =====================================
+// ✅ INIT CRON JOBS
+// =====================================
 initCronJobs();
 
-/* =====================================
-   ✅ CORS CONFIGURATION
-===================================== */
+// =====================================
+// ✅ SECURITY MIDDLEWARE
+// =====================================
+app.use(helmet());
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+// =====================================
+// ✅ CORS CONFIGURATION
+// =====================================
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? ['https://your-production-domain.com']
+  : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:8080'];
+
 app.use(cors({
-  origin: '*',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  credentials: false
+  credentials: true
 }));
 
-/* =====================================
-   ✅ MIDDLEWARE
-===================================== */
+// =====================================
+// ✅ MIDDLEWARE
+// =====================================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* =====================================
-   ✅ ROUTES
-===================================== */
+// =====================================
+// ✅ ROUTES
+// =====================================
 app.use('/api/auth', authRoutes);
 app.use('/api/bikes', bikeRoutes);
 app.use('/api/rentals', rentalRoutes);
@@ -62,33 +107,33 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/hero-images', heroImageRoutes);
 app.use('/api/support', supportRoutes);
 
-/* =====================================
-   ✅ HEALTH CHECK
-===================================== */
+// =====================================
+// ✅ HEALTH CHECK
+// =====================================
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
-/* =====================================
-   ✅ ROOT ROUTE
-===================================== */
+// =====================================
+// ✅ ROOT ROUTE
+// =====================================
 app.get('/', (req, res) => {
   res.send('Bike Rental API is running.');
 });
 
-/* =====================================
-   ✅ GLOBAL ERROR HANDLER
-===================================== */
+// =====================================
+// ✅ GLOBAL ERROR HANDLER
+// =====================================
 app.use((err, req, res, next) => {
-  console.error('❌ Error:', err.message);
+  logger.error(err.message, { stack: err.stack });
   res.status(500).json({
     message: err.message || 'Internal Server Error'
   });
 });
 
-/* =====================================
-   ✅ START SERVER
-===================================== */
+// =====================================
+// ✅ START SERVER
+// =====================================
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  logger.info(`🚀 Server running on port ${PORT}`);
 });

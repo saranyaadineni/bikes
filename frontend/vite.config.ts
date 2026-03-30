@@ -1,15 +1,15 @@
-import { defineConfig, loadEnv, Plugin } from "vite";
-import react from "@vitejs/plugin-react-swc";
-// No Node path imports to avoid TS Node type dependency
+import { defineConfig, loadEnv, Plugin, LogLevel } from 'vite';
+import react from '@vitejs/plugin-react-swc';
+import eslint from 'vite-plugin-eslint';
 
 // Plugin to suppress proxy connection errors in development
 function suppressProxyErrors(): Plugin {
   return {
     name: 'suppress-proxy-errors',
-    configureServer(server) {
+    configureServer() {
       // Override stderr to filter proxy errors
       const originalError = process.stderr.write.bind(process.stderr);
-      process.stderr.write = (chunk: any, encoding?: any, cb?: any) => {
+      process.stderr.write = (chunk: string | Uint8Array, encoding?: BufferEncoding | ((error?: Error | null) => void), cb?: (error?: Error | null) => void) => {
         const message = chunk?.toString() || '';
         // Suppress specific proxy connection errors
         if (
@@ -17,26 +17,31 @@ function suppressProxyErrors(): Plugin {
           (message.includes('ECONNREFUSED') && message.includes('/api'))
         ) {
           // Silently ignore - backend might not be running
+          if (typeof encoding === 'function') {
+            encoding();
+          } else if (typeof cb === 'function') {
+            cb();
+          }
           return true;
         }
-        return originalError(chunk, encoding, cb);
+        return originalError(chunk, encoding as any, cb as any);
       };
     },
   };
 }
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode }: { mode: string }) => {
   const env = loadEnv(mode, process.cwd());
-  const target = env.VITE_API_PROXY_TARGET || "http://localhost:3000";
+  const target = env.VITE_API_PROXY_TARGET || 'http://localhost:3000';
   const isProduction = mode === 'production';
-  
+
   return {
     server: {
-      host: "::",
+      host: '::',
       port: 8080,
       proxy: {
-        "/api": {
+        '/api': {
           target,
           changeOrigin: true,
           secure: false,
@@ -44,23 +49,23 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    plugins: [react(), suppressProxyErrors()],
+    plugins: [react(), suppressProxyErrors(), eslint()],
     resolve: {
       alias: {
-        "@": "/src",
+        '@': '/src',
       },
     },
     build: {
       // Production optimizations
       target: 'es2020',
-      minify: 'esbuild',
+      minify: 'esbuild' as const,
       cssMinify: true,
-      sourcemap: !isProduction,
+      sourcemap: (isProduction ? 'hidden' : true) as boolean | 'hidden' | 'inline',
       // Increase chunk size warning limit
       chunkSizeWarningLimit: 1000,
       reportCompressedSize: false, // Speed up build
     },
-    logLevel: isProduction ? 'warn' : 'info',
+    logLevel: (isProduction ? 'warn' : 'info') as LogLevel,
     clearScreen: false,
   };
 });

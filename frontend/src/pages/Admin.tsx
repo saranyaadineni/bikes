@@ -41,9 +41,56 @@ import {
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { SEO } from '@/components/SEO';
-import { bikesAPI, usersAPI, documentsAPI, rentalsAPI, authAPI, getCurrentUser, locationsAPI } from '@/lib/api';
+import {
+  bikesAPI,
+  usersAPI,
+  documentsAPI,
+  rentalsAPI,
+  authAPI,
+  getCurrentUser,
+  locationsAPI,
+} from '@/lib/api';
 import { Bike as BikeType } from '@/types';
 import { SupportManager } from '@/components/admin/SupportManager';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isVerified: boolean;
+  currentLocationId?: string;
+  currentAddress?: string;
+  locationId?: string | { id?: string; _id?: string };
+}
+
+interface Location {
+  id: string;
+  name: string;
+  city: string;
+}
+
+interface Rental {
+  id: string;
+  userId: string;
+  bikeId: string;
+  status: string;
+  startTime: string;
+  endTime: string;
+  scheduledEndTime?: string;
+  delay?: number;
+  totalCost?: number;
+  bike?: BikeType;
+}
+
+interface Document {
+  id: string;
+  userId: string;
+  type: string;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string;
+}
+
 import { useTheme } from 'next-themes';
 import {
   Dialog,
@@ -52,7 +99,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -67,10 +120,19 @@ const statusStyles = {
   rejected: { color: 'bg-destructive/10 text-destructive', icon: XCircle },
 };
 
-const adminTabIds = ['dashboard', 'bikes', 'allVehicles', 'bookings', 'users', 'documents', 'settings', 'support'] as const;
+const adminTabIds = [
+  'dashboard',
+  'bikes',
+  'allVehicles',
+  'bookings',
+  'users',
+  'documents',
+  'settings',
+  'support',
+] as const;
 
 // Helper function to format location name for display (removes "Main Garage" suffix)
-const formatLocationDisplay = (loc: any): string => {
+const formatLocationDisplay = (loc: Location | null | undefined): string => {
   if (!loc) return '';
   // Show only the city name as per requirement
   return loc.city || loc.name || '';
@@ -82,16 +144,82 @@ const toLocalISOString = (date: Date) => {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 };
 
-
 const PREDEFINED_BIKE_SPECS = [
-  { brand: 'Honda', models: ['Activa 6G', 'Activa 125', 'Dio', 'Shine', 'Unicorn', 'Hornet 2.0', 'Hness CB350', 'CB350RS'] },
-  { brand: 'TVS', models: ['Jupiter', 'iQube', 'Ntorq 125', 'Apache RTR 160', 'Apache RTR 200', 'Raider', 'XL100', 'Ronin'] },
-  { brand: 'Suzuki', models: ['Access 125', 'Burgman Street', 'Avenis', 'Gixxer 150', 'Gixxer SF 250', 'V-Strom SX'] },
-  { brand: 'Yamaha', models: ['Ray ZR 125', 'Fascino 125', 'FZ-S FI', 'MT-15 V2', 'R15 V4', 'Aerox 155', 'FZX'] },
-  { brand: 'Hero', models: ['Splendor Plus', 'HF Deluxe', 'Passion XTEC', 'Glamour', 'Xpulse 200 4V', 'Destini 125', 'Pleasure Plus', 'Vida V1'] },
-  { brand: 'Royal Enfield', models: ['Classic 350', 'Bullet 350', 'Meteor 350', 'Hunter 350', 'Himalayan 450', 'Continental GT 650', 'Interceptor 650'] },
-  { brand: 'Bajaj', models: ['Pulsar 125', 'Pulsar 150', 'Pulsar NS200', 'Dominar 400', 'Chetak', 'Platina', 'Avenger Cruise 220'] },
-  { brand: 'KTM', models: ['Duke 200', 'Duke 250', 'Duke 390', 'RC 200', 'RC 390', 'Adventure 390'] },
+  {
+    brand: 'Honda',
+    models: [
+      'Activa 6G',
+      'Activa 125',
+      'Dio',
+      'Shine',
+      'Unicorn',
+      'Hornet 2.0',
+      'Hness CB350',
+      'CB350RS',
+    ],
+  },
+  {
+    brand: 'TVS',
+    models: [
+      'Jupiter',
+      'iQube',
+      'Ntorq 125',
+      'Apache RTR 160',
+      'Apache RTR 200',
+      'Raider',
+      'XL100',
+      'Ronin',
+    ],
+  },
+  {
+    brand: 'Suzuki',
+    models: ['Access 125', 'Burgman Street', 'Avenis', 'Gixxer 150', 'Gixxer SF 250', 'V-Strom SX'],
+  },
+  {
+    brand: 'Yamaha',
+    models: ['Ray ZR 125', 'Fascino 125', 'FZ-S FI', 'MT-15 V2', 'R15 V4', 'Aerox 155', 'FZX'],
+  },
+  {
+    brand: 'Hero',
+    models: [
+      'Splendor Plus',
+      'HF Deluxe',
+      'Passion XTEC',
+      'Glamour',
+      'Xpulse 200 4V',
+      'Destini 125',
+      'Pleasure Plus',
+      'Vida V1',
+    ],
+  },
+  {
+    brand: 'Royal Enfield',
+    models: [
+      'Classic 350',
+      'Bullet 350',
+      'Meteor 350',
+      'Hunter 350',
+      'Himalayan 450',
+      'Continental GT 650',
+      'Interceptor 650',
+    ],
+  },
+  {
+    brand: 'Bajaj',
+    models: [
+      'Pulsar 125',
+      'Pulsar 150',
+      'Pulsar NS200',
+      'Dominar 400',
+      'Chetak',
+      'Platina',
+      'Avenger Cruise 220',
+    ],
+  },
+  {
+    brand: 'KTM',
+    models: ['Duke 200', 'Duke 250', 'Duke 390', 'RC 200', 'RC 390', 'Adventure 390'],
+  },
   { brand: 'Ola', models: ['S1 Pro', 'S1 Air', 'S1 X'] },
   { brand: 'Ather', models: ['450X', '450S', 'Rizta'] },
 ];
@@ -107,16 +235,16 @@ export default function Admin() {
   const [bookingSearchQuery, setBookingSearchQuery] = useState('');
   const [bikeSearchQuery, setBikeSearchQuery] = useState('');
   const [bikes, setBikes] = useState<BikeType[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [locations, setLocations] = useState<any[]>([]);
-  const [rentals, setRentals] = useState<any[]>([]);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [selectedDocumentUser, setSelectedDocumentUser] = useState<any>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [rentals, setRentals] = useState<Rental[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedDocumentUser, setSelectedDocumentUser] = useState<User | null>(null);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'active' | 'pending'>('all');
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [bikeDialogOpen, setBikeDialogOpen] = useState(false);
@@ -124,30 +252,30 @@ export default function Admin() {
 
   // End Ride Dialog State
   const [endRideDialogOpen, setEndRideDialogOpen] = useState(false);
-  const [endRideData, setEndRideData] = useState<{ 
-    id: string; 
+  const [endRideData, setEndRideData] = useState<{
+    id: string;
     bikeId: string;
-    startKm: string; 
-    endKm: string; 
-    delay: string; 
-    startTime: string; 
+    startKm: string;
+    endKm: string;
+    delay: string;
+    startTime: string;
     endTime: string;
     actualReturnTime: string;
     scheduledEndTime: string;
     rawStartTime: string;
     totalPrice: string;
-  }>({ 
-    id: '', 
+  }>({
+    id: '',
     bikeId: '',
-    startKm: '', 
-    endKm: '', 
-    delay: '', 
-    startTime: '', 
+    startKm: '',
+    endKm: '',
+    delay: '',
+    startTime: '',
     endTime: '',
     actualReturnTime: '',
     scheduledEndTime: '',
     rawStartTime: '',
-    totalPrice: ''
+    totalPrice: '',
   });
   const [slideValue, setSlideValue] = useState(0);
   const [isEnding, setIsEnding] = useState(false);
@@ -155,17 +283,17 @@ export default function Admin() {
   const [selectedTime, setSelectedTime] = useState<string>('');
   const timeTickRef = useRef<number | null>(null);
 
-  const [bikeForm, setBikeForm] = useState<any>({ 
-    name: '', 
-    brand: '', 
+  const [bikeForm, setBikeForm] = useState<any>({
+    name: '',
+    brand: '',
     year: '',
-    type: 'fuel', 
-    category: 'midrange', 
-    pricePerHour: '', 
+    type: 'fuel',
+    category: 'midrange',
+    pricePerHour: '',
     price12Hours: '',
     pricePerWeek: '',
-    kmLimit: '', 
-    locationId: '', 
+    kmLimit: '',
+    locationId: '',
     image: '',
     images: ['', '', ''], // Initialize with 3 empty strings for 3 additional images
     weekdayRate: '',
@@ -173,7 +301,7 @@ export default function Admin() {
     excessKmCharge: '',
     kmLimitPerHour: '',
     minBookingHours: '',
-    gstPercentage: ''
+    gstPercentage: '',
   });
   const [brandSearch, setBrandSearch] = useState('');
   const [selectedBrandFilter, setSelectedBrandFilter] = useState<string>('all');
@@ -217,9 +345,9 @@ export default function Admin() {
     }
     if (user.role !== 'admin') {
       toast({
-        title: "Access Denied",
-        description: "Admin access required",
-        variant: "destructive",
+        title: 'Access Denied',
+        description: 'Admin access required',
+        variant: 'destructive',
       });
       navigate('/dashboard');
       return;
@@ -264,7 +392,9 @@ export default function Admin() {
     const tick = () => {
       const now = new Date();
       setSelectedDate(now);
-      setSelectedTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+      setSelectedTime(
+        `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      );
 
       // Also keep the submitted actualReturnTime in sync (this is what drives delay calc).
       setEndRideData((prev) => {
@@ -302,7 +432,7 @@ export default function Admin() {
 
   const handleEndRideSubmit = async () => {
     if (isEnding) return;
-    
+
     // Validation for KM readings
     const missingKmFields = [];
     if (!endRideData.startKm) missingKmFields.push('Starting Ride (km)');
@@ -310,9 +440,9 @@ export default function Admin() {
 
     if (missingKmFields.length > 0) {
       toast({
-        title: "Validation Error",
+        title: 'Validation Error',
         description: `${missingKmFields.join(' and ')} ${missingKmFields.length > 1 ? 'fields are empty' : 'field is empty'}`,
-        variant: "destructive",
+        variant: 'destructive',
       });
       setSlideValue(0); // Reset slider
       return;
@@ -323,9 +453,9 @@ export default function Admin() {
 
     if (isNaN(startVal) || isNaN(endVal)) {
       toast({
-        title: "Validation Error",
-        description: "Please enter valid numbers for KM readings",
-        variant: "destructive",
+        title: 'Validation Error',
+        description: 'Please enter valid numbers for KM readings',
+        variant: 'destructive',
       });
       setSlideValue(0);
       return;
@@ -333,9 +463,9 @@ export default function Admin() {
 
     if (endVal < startVal) {
       toast({
-        title: "Validation Error",
-        description: "Ending Ride (km) cannot be less than Starting Ride (km)",
-        variant: "destructive",
+        title: 'Validation Error',
+        description: 'Ending Ride (km) cannot be less than Starting Ride (km)',
+        variant: 'destructive',
       });
       setSlideValue(0);
       return;
@@ -348,36 +478,40 @@ export default function Admin() {
       const endKm = endVal;
       const delayHours = parseFloat(endRideData.delay);
       const bike = bikesById[endRideData.bikeId];
-      
+
       let distancePrice = 0;
       let delayPrice = 0;
-      
+
       if (!isNaN(startKm) && !isNaN(endKm) && bike && bike.excessKmCharge && bike.kmLimit) {
         const totalKm = Math.max(0, endKm - startKm);
         const kmLimit = bike.kmLimit;
         const excessKm = Math.max(0, totalKm - kmLimit);
         distancePrice = excessKm * bike.excessKmCharge;
       }
-      
+
       if (!isNaN(delayHours) && bike && delayHours > 0) {
         const hourlyRate = bike.weekdayRate || bike.pricePerHour || 0;
         delayPrice = delayHours * hourlyRate;
       }
-      
+
       const calculatedTotalPrice = distancePrice + delayPrice;
-      
+
       await rentalsAPI.completeRide(endRideData.id, {
         startKm: startVal,
         endKm: endVal,
         // UI uses hours; backend stores delay as a number (historically minutes).
         delay: (delayHours || 0) * 60,
-        totalCost: calculatedTotalPrice
+        totalCost: calculatedTotalPrice,
       });
-      toast({ title: "Ride Ended", description: "Booking closed successfully." });
+      toast({ title: 'Ride Ended', description: 'Booking closed successfully.' });
       setEndRideDialogOpen(false);
       loadData();
     } catch (e: any) {
-      toast({ title: "Error", description: e.message || "Failed to end ride", variant: "destructive" });
+      toast({
+        title: 'Error',
+        description: e.message || 'Failed to end ride',
+        variant: 'destructive',
+      });
       setSlideValue(0); // Reset slider on error
     } finally {
       setIsEnding(false);
@@ -399,13 +533,13 @@ export default function Admin() {
       try {
         const locationsData = await locationsAPI.getAll();
         setLocations(locationsData);
-        const ids = new Set(locationsData.map((l: any) => l.id));
+        const ids = new Set(locationsData.map((l: Location) => l.id));
         if (assignedLocationId && ids.has(assignedLocationId)) {
           normalizedLocationId = assignedLocationId;
           localStorage.setItem('selectedLocation', assignedLocationId);
         }
         if (normalizedLocationId && !ids.has(normalizedLocationId)) {
-          const byName = locationsData.find((l: any) => l.name === normalizedLocationId);
+          const byName = locationsData.find((l: Location) => l.name === normalizedLocationId);
           if (byName?.id) {
             normalizedLocationId = byName.id;
             localStorage.setItem('selectedLocation', byName.id);
@@ -454,10 +588,12 @@ export default function Admin() {
         // Merge predefined specs with database specs
         const mergedSpecs = [...PREDEFINED_BIKE_SPECS];
         specs.forEach((dbSpec: any) => {
-          const existing = mergedSpecs.find(s => s.brand.toLowerCase() === dbSpec.brand.toLowerCase());
+          const existing = mergedSpecs.find(
+            (s) => s.brand.toLowerCase() === dbSpec.brand.toLowerCase()
+          );
           if (existing) {
             dbSpec.models.forEach((m: string) => {
-              if (!existing.models.some(em => em.toLowerCase() === m.toLowerCase())) {
+              if (!existing.models.some((em) => em.toLowerCase() === m.toLowerCase())) {
                 existing.models.push(m);
               }
             });
@@ -471,9 +607,9 @@ export default function Admin() {
       }
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to load data",
-        variant: "destructive",
+        title: 'Error',
+        description: error.message || 'Failed to load data',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -482,12 +618,20 @@ export default function Admin() {
 
   const BikeImagePreview = ({ url, label }: { url: string; label: string }) => {
     const [hasError, setHasError] = useState(false);
-    useEffect(() => { setHasError(false); }, [url]);
+    useEffect(() => {
+      setHasError(false);
+    }, [url]);
 
     if (!url) return null;
 
     return (
-      <div className="relative group cursor-pointer w-24 h-24 flex-shrink-0" onClick={() => { setPreviewImageUrl(url); setIsPreviewModalOpen(true); }}>
+      <div
+        className="relative group cursor-pointer w-24 h-24 flex-shrink-0"
+        onClick={() => {
+          setPreviewImageUrl(url);
+          setIsPreviewModalOpen(true);
+        }}
+      >
         <img
           src={url}
           alt={label}
@@ -496,20 +640,22 @@ export default function Admin() {
         />
         {hasError && (
           <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-lg">
-            <span className="text-[10px] text-destructive font-medium text-center px-1">Failed to load</span>
+            <span className="text-[10px] text-destructive font-medium text-center px-1">
+              Failed to load
+            </span>
           </div>
         )}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-           <div className="bg-black/40 text-white p-1 rounded-full backdrop-blur-sm">
-             <Maximize2 className="h-4 w-4" />
-           </div>
+          <div className="bg-black/40 text-white p-1 rounded-full backdrop-blur-sm">
+            <Maximize2 className="h-4 w-4" />
+          </div>
         </div>
       </div>
     );
   };
 
   const handleLogout = () => {
-    if (window.confirm("Are you sure you want to logout?")) {
+    if (window.confirm('Are you sure you want to logout?')) {
       authAPI.logout();
       navigate('/');
     }
@@ -522,11 +668,11 @@ export default function Admin() {
       setIsRejectionModalOpen(true);
       return;
     }
-    
+
     try {
       await documentsAPI.updateStatus(docId, 'approved');
       toast({
-        title: "Document Approved",
+        title: 'Document Approved',
         description: 'Document status updated successfully.',
       });
       loadData();
@@ -536,9 +682,9 @@ export default function Admin() {
         return;
       }
       toast({
-        title: "Error",
-        description: error.message || "Failed to update document",
-        variant: "destructive",
+        title: 'Error',
+        description: error.message || 'Failed to update document',
+        variant: 'destructive',
       });
     }
   };
@@ -547,9 +693,9 @@ export default function Admin() {
     if (!docToReject) return;
     if (!rejectionReason.trim()) {
       toast({
-        title: "Reason Required",
-        description: "Please enter a reason for rejection",
-        variant: "destructive",
+        title: 'Reason Required',
+        description: 'Please enter a reason for rejection',
+        variant: 'destructive',
       });
       return;
     }
@@ -557,7 +703,7 @@ export default function Admin() {
     try {
       await documentsAPI.updateStatus(docToReject, 'rejected', rejectionReason);
       toast({
-        title: "Document Rejected",
+        title: 'Document Rejected',
         description: 'Document status updated successfully.',
       });
       setIsRejectionModalOpen(false);
@@ -566,20 +712,20 @@ export default function Admin() {
       loadData();
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to reject document",
-        variant: "destructive",
+        title: 'Error',
+        description: error.message || 'Failed to reject document',
+        variant: 'destructive',
       });
     }
   };
-  
+
   const handleViewUser = (userId: string) => {
-    const user = users.find(u => u.id === userId);
+    const user = users.find((u) => u.id === userId);
     if (!user) {
       toast({
-        title: "Error",
-        description: "User not found",
-        variant: "destructive",
+        title: 'Error',
+        description: 'User not found',
+        variant: 'destructive',
       });
       return;
     }
@@ -588,12 +734,12 @@ export default function Admin() {
   };
 
   const handleViewUserDocuments = (userId: string) => {
-    const user = users.find(u => u.id === userId);
+    const user = users.find((u) => u.id === userId);
     if (!user) {
       toast({
-        title: "Error",
-        description: "User not found",
-        variant: "destructive",
+        title: 'Error',
+        description: 'User not found',
+        variant: 'destructive',
       });
       return;
     }
@@ -605,7 +751,7 @@ export default function Admin() {
     try {
       await usersAPI.update(userId, { isVerified: status });
       toast({
-        title: status ? "User Verified" : "User Unverified",
+        title: status ? 'User Verified' : 'User Unverified',
         description: `User status updated to ${status ? 'verified' : 'unverified'}.`,
       });
       setIsUserDialogOpen(false);
@@ -613,9 +759,9 @@ export default function Admin() {
       loadData();
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to verify user",
-        variant: "destructive",
+        title: 'Error',
+        description: error.message || 'Failed to verify user',
+        variant: 'destructive',
       });
     }
   };
@@ -631,17 +777,43 @@ export default function Admin() {
     { id: 'support', label: 'Support', icon: Headphones },
   ];
 
-  const bikesById: Record<string, BikeType> = Object.fromEntries(bikes.map(b => [b.id, b]));
-  const inUseRentals = rentals.filter((r) => (r.status === 'ongoing' || r.status === 'active') && bikesById[r.bikeId]);
-  const inUseBikeIds = new Set(inUseRentals.map(r => r.bikeId));
-  const availableCount = bikes.filter(b => b.available).length;
+  const bikesById: Record<string, BikeType> = Object.fromEntries(bikes.map((b) => [b.id, b]));
+  const inUseRentals = rentals.filter(
+    (r) => (r.status === 'ongoing' || r.status === 'active') && bikesById[r.bikeId]
+  );
+  const inUseBikeIds = new Set(inUseRentals.map((r) => r.bikeId));
+  const availableCount = bikes.filter((b) => b.available).length;
   const inUseCount = inUseRentals.length;
-  const maintenanceCount = bikes.filter(b => !b.available && !inUseBikeIds.has(b.id)).length;
+  const maintenanceCount = bikes.filter((b) => !b.available && !inUseBikeIds.has(b.id)).length;
   const stats = [
-    { label: 'Total Bikes', value: bikes.length, icon: Bike, color: 'gradient-hero', onClick: () => setTab('bikes') },
-    { label: 'Available', value: availableCount, icon: Bike, color: 'bg-accent', onClick: () => setTab('bikes') },
-    { label: 'In Use', value: inUseCount, icon: Bike, color: 'bg-primary', onClick: () => setTab('bookings') },
-    { label: 'Maintenance', value: maintenanceCount, icon: Wrench, color: 'bg-secondary', onClick: () => setTab('bikes') },
+    {
+      label: 'Total Bikes',
+      value: bikes.length,
+      icon: Bike,
+      color: 'gradient-hero',
+      onClick: () => setTab('bikes'),
+    },
+    {
+      label: 'Available',
+      value: availableCount,
+      icon: Bike,
+      color: 'bg-accent',
+      onClick: () => setTab('bikes'),
+    },
+    {
+      label: 'In Use',
+      value: inUseCount,
+      icon: Bike,
+      color: 'bg-primary',
+      onClick: () => setTab('bookings'),
+    },
+    {
+      label: 'Maintenance',
+      value: maintenanceCount,
+      icon: Wrench,
+      color: 'bg-secondary',
+      onClick: () => setTab('bikes'),
+    },
   ];
 
   const rentalsForLocation = rentals.filter((r) => {
@@ -655,7 +827,9 @@ export default function Admin() {
     return bikeLocationId ? bikeLocationId === selectedLocationId : false;
   });
 
-  const selectedCity = String(locations.find((l) => l.id === selectedLocationId)?.city || '').trim().toLowerCase();
+  const selectedCity = String(locations.find((l) => l.id === selectedLocationId)?.city || '')
+    .trim()
+    .toLowerCase();
   // Filter users strictly by their current location (ID match or city match)
   const usersForLocation = users.filter((user) => {
     const userLocId = String(user.currentLocationId || '').trim();
@@ -663,60 +837,78 @@ export default function Admin() {
       if (userLocId && userLocId === selectedLocationId) return true;
     }
     if (!selectedCity) return false;
-    const addr = String(user.currentAddress || '').trim().toLowerCase();
+    const addr = String(user.currentAddress || '')
+      .trim()
+      .toLowerCase();
     return addr === selectedCity || addr.startsWith(`${selectedCity} -`);
   });
 
-  const filteredBikes = bikes.filter(bike => {
+  const filteredBikes = bikes.filter((bike) => {
     const q = bikeSearchQuery.toLowerCase();
     if (!q) return true;
-    
+
     // Match Bike Name or Brand
-    if (bike.name.toLowerCase().includes(q) || 
-        (bike.brand && bike.brand.toLowerCase().includes(q))) {
+    if (
+      bike.name.toLowerCase().includes(q) ||
+      (bike.brand && bike.brand.toLowerCase().includes(q))
+    ) {
       return true;
     }
-    
+
     // Match Current Renter Name/Email
-    const rental = inUseRentals.find(r => r.bikeId === bike.id);
+    const rental = inUseRentals.find((r) => r.bikeId === bike.id);
     if (rental) {
-      const user = users.find(u => u.id === rental.userId);
+      const user = users.find((u) => u.id === rental.userId);
       if (user) {
-         if (String(user.name || '').toLowerCase().includes(q) ||
-             String(user.email || '').toLowerCase().includes(q)) {
-           return true;
-         }
+        if (
+          String(user.name || '')
+            .toLowerCase()
+            .includes(q) ||
+          String(user.email || '')
+            .toLowerCase()
+            .includes(q)
+        ) {
+          return true;
+        }
       }
     }
-    
+
     return false;
   });
 
   const filteredUsers = usersForLocation
-    .filter(user => {
+    .filter((user) => {
       if (userStatusFilter === 'active') return user.isVerified;
       if (userStatusFilter === 'pending') return !user.isVerified;
       return true;
     })
-    .filter(user => {
+    .filter((user) => {
       const q = searchQuery.toLowerCase();
       if (!q) return true;
-      
+
       // Match Name or Email
-      if (String(user.name || '').toLowerCase().includes(q) ||
-          String(user.email || '').toLowerCase().includes(q)) {
+      if (
+        String(user.name || '')
+          .toLowerCase()
+          .includes(q) ||
+        String(user.email || '')
+          .toLowerCase()
+          .includes(q)
+      ) {
         return true;
       }
-      
+
       // Match Rented Bike Name
-      const userRental = rentals.find(r => r.userId === user.id && (r.status === 'ongoing' || r.status === 'active'));
+      const userRental = rentals.find(
+        (r) => r.userId === user.id && (r.status === 'ongoing' || r.status === 'active')
+      );
       if (userRental) {
         const bike = bikesById[userRental.bikeId];
         if (bike && bike.name.toLowerCase().includes(q)) {
           return true;
         }
       }
-      
+
       return false;
     });
   const userById: Record<string, any> = Object.fromEntries(users.map((u) => [u.id, u]));
@@ -727,14 +919,18 @@ export default function Admin() {
         const docUserLocationId = String(docUser.currentLocationId || '').trim();
         if (docUserLocationId && docUserLocationId === selectedLocationId) return true;
         if (!selectedCity) return false;
-        const currentAddress = String(docUser.currentAddress || '').trim().toLowerCase();
+        const currentAddress = String(docUser.currentAddress || '')
+          .trim()
+          .toLowerCase();
         return currentAddress === selectedCity || currentAddress.startsWith(`${selectedCity} -`);
       })
     : documents;
   const today = new Date().toISOString().slice(0, 10);
-  const pickupsToday = rentalsForLocation.filter(r => r.startTime?.slice(0, 10) === today).length;
-  const dropoffsToday = rentalsForLocation.filter(r => r.endTime && r.endTime.slice(0, 10) === today).length;
-  const pendingDocsCount = documentsForLocation.filter(d => d.status === 'pending').length;
+  const pickupsToday = rentalsForLocation.filter((r) => r.startTime?.slice(0, 10) === today).length;
+  const dropoffsToday = rentalsForLocation.filter(
+    (r) => r.endTime && r.endTime.slice(0, 10) === today
+  ).length;
+  const pendingDocsCount = documentsForLocation.filter((d) => d.status === 'pending').length;
 
   if (isLoading) {
     return (
@@ -749,7 +945,7 @@ export default function Admin() {
 
   return (
     <div className="h-screen bg-background flex flex-col md:flex-row overflow-hidden">
-      <SEO 
+      <SEO
         title="Admin Dashboard"
         description="Manage bikes, users, and rentals on the RideFlow admin dashboard."
         noindex={true}
@@ -764,13 +960,15 @@ export default function Admin() {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <span className="font-display font-bold">RideFlow</span>
-              <Badge variant="secondary" className="text-xs">Admin</Badge>
+              <Badge variant="secondary" className="text-xs">
+                Admin
+              </Badge>
             </div>
-            {selectedLocationId && locations.find(loc => loc.id === selectedLocationId) && (
+            {selectedLocationId && locations.find((loc) => loc.id === selectedLocationId) && (
               <div className="mt-1">
                 <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
                   <MapPin className="h-3 w-3" />
-                  {formatLocationDisplay(locations.find(loc => loc.id === selectedLocationId))}
+                  {formatLocationDisplay(locations.find((loc) => loc.id === selectedLocationId))}
                 </Badge>
               </div>
             )}
@@ -823,7 +1021,11 @@ export default function Admin() {
               )}
             </Button>
           )}
-          <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground" onClick={handleLogout}>
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 text-muted-foreground"
+            onClick={handleLogout}
+          >
             <LogOut className="h-5 w-5" />
             Logout
           </Button>
@@ -848,16 +1050,24 @@ export default function Admin() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-display font-bold">RideFlow</span>
-                      <Badge variant="secondary" className="text-xs">Admin</Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        Admin
+                      </Badge>
                     </div>
-                    {selectedLocationId && locations.find(loc => loc.id === selectedLocationId) && (
-                      <div className="mt-1">
-                        <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
-                          <MapPin className="h-3 w-3" />
-                          {formatLocationDisplay(locations.find(loc => loc.id === selectedLocationId))}
-                        </Badge>
-                      </div>
-                    )}
+                    {selectedLocationId &&
+                      locations.find((loc) => loc.id === selectedLocationId) && (
+                        <div className="mt-1">
+                          <Badge
+                            variant="outline"
+                            className="text-xs flex items-center gap-1 w-fit"
+                          >
+                            <MapPin className="h-3 w-3" />
+                            {formatLocationDisplay(
+                              locations.find((loc) => loc.id === selectedLocationId)
+                            )}
+                          </Badge>
+                        </div>
+                      )}
                   </div>
                 </div>
               </div>
@@ -872,9 +1082,7 @@ export default function Admin() {
                           if (tab.id === 'users') setUserStatusFilter('all');
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                          activeTab === tab.id
-                            ? 'bg-primary/10 text-primary'
-                            : 'hover:bg-muted/50'
+                          activeTab === tab.id ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50'
                         }`}
                       >
                         <tab.icon className="h-5 w-5" />
@@ -886,38 +1094,42 @@ export default function Admin() {
               </div>
 
               <div className="mt-auto space-y-2 pt-4 border-t border-border">
-                  <div className="px-4 py-2 text-sm">
-                    <p className="font-medium">{currentUser?.name}</p>
-                    <p className="text-xs text-muted-foreground">{currentUser?.email}</p>
-                  </div>
-                  {mounted && (
-                    <SheetClose asChild>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start gap-3 text-muted-foreground"
-                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                      >
-                        {theme === 'dark' ? (
-                          <>
-                            <Sun className="h-5 w-5" />
-                            Light Mode
-                          </>
-                        ) : (
-                          <>
-                            <Moon className="h-5 w-5" />
-                            Dark Mode
-                          </>
-                        )}
-                      </Button>
-                    </SheetClose>
-                  )}
+                <div className="px-4 py-2 text-sm">
+                  <p className="font-medium">{currentUser?.name}</p>
+                  <p className="text-xs text-muted-foreground">{currentUser?.email}</p>
+                </div>
+                {mounted && (
                   <SheetClose asChild>
-                    <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground" onClick={handleLogout}>
-                      <LogOut className="h-5 w-5" />
-                      Logout
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-3 text-muted-foreground"
+                      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    >
+                      {theme === 'dark' ? (
+                        <>
+                          <Sun className="h-5 w-5" />
+                          Light Mode
+                        </>
+                      ) : (
+                        <>
+                          <Moon className="h-5 w-5" />
+                          Dark Mode
+                        </>
+                      )}
                     </Button>
                   </SheetClose>
-                </div>
+                )}
+                <SheetClose asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 text-muted-foreground"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="h-5 w-5" />
+                    Logout
+                  </Button>
+                </SheetClose>
+              </div>
             </SheetContent>
           </Sheet>
 
@@ -936,29 +1148,35 @@ export default function Admin() {
               <div>
                 <div className="flex items-center gap-3 mb-2">
                   <h1 className="text-2xl font-display font-bold">Dashboard</h1>
-                  {selectedLocationId && locations.find(loc => loc.id === selectedLocationId) && (
+                  {selectedLocationId && locations.find((loc) => loc.id === selectedLocationId) && (
                     <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-lg">
                       <MapPin className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium text-primary">
-                        {formatLocationDisplay(locations.find(loc => loc.id === selectedLocationId))}
+                        {formatLocationDisplay(
+                          locations.find((loc) => loc.id === selectedLocationId)
+                        )}
                       </span>
                     </div>
                   )}
                 </div>
-                <p className="text-muted-foreground">Operational overview for your assigned city/garage.</p>
+                <p className="text-muted-foreground">
+                  Operational overview for your assigned city/garage.
+                </p>
               </div>
             </div>
 
             {/* Stats */}
             <div className="grid md:grid-cols-4 gap-4">
               {stats.map((stat) => (
-                <div 
-                  key={stat.label} 
+                <div
+                  key={stat.label}
                   className={`bg-card rounded-2xl shadow-card p-6 ${stat.onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
                   onClick={stat.onClick}
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl ${stat.color} flex items-center justify-center`}>
+                    <div
+                      className={`w-12 h-12 rounded-xl ${stat.color} flex items-center justify-center`}
+                    >
                       <stat.icon className="h-6 w-6 text-primary-foreground" />
                     </div>
                     <div>
@@ -970,7 +1188,7 @@ export default function Admin() {
               ))}
             </div>
             <div className="grid md:grid-cols-3 gap-4">
-              <div 
+              <div
                 className="bg-card rounded-2xl shadow-card p-6 cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => setTab('bookings')}
               >
@@ -984,7 +1202,7 @@ export default function Admin() {
                   </div>
                 </div>
               </div>
-              <div 
+              <div
                 className="bg-card rounded-2xl shadow-card p-6 cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => setTab('bookings')}
               >
@@ -998,7 +1216,7 @@ export default function Admin() {
                   </div>
                 </div>
               </div>
-              <div 
+              <div
                 className="bg-card rounded-2xl shadow-card p-6 cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => setTab('documents')}
               >
@@ -1036,100 +1254,140 @@ export default function Admin() {
 
             <div className="bg-card rounded-2xl shadow-card overflow-hidden">
               <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-[900px]">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left px-6 py-4 font-medium">Bike</th>
-                    <th className="text-left px-6 py-4 font-medium">Type</th>
-                    <th className="text-left px-6 py-4 font-medium">Price/Hr</th>
-                    <th className="text-left px-6 py-4 font-medium">KM Limit</th>
-                    <th className="text-left px-6 py-4 font-medium">Status</th>
-                    <th className="text-left px-6 py-4 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredBikes.map((bike) => (
-                    <tr key={bike.id} className="hover:bg-muted/30">
-                      <td className="px-6 py-4 font-medium">{bike.name}</td>
-                      <td className="px-6 py-4 capitalize">{bike.type}</td>
-                      <td className="px-6 py-4">₹{bike.weekdayRate || bike.pricePerHour || Math.round((bike.price12Hours || 0) / 12)}</td>
-                      <td className="px-6 py-4">{bike.kmLimitPerHour ? `${bike.kmLimitPerHour} km/hr` : `${bike.kmLimit} km`}</td>
-                      <td className="px-6 py-4">
-                        <Badge 
-                          variant={bike.available ? 'default' : 'secondary'} 
-                          className={
-                            inUseBikeIds.has(bike.id) ? 'bg-primary text-primary-foreground' :
-                            bike.status === 'maintenance' ? 'bg-secondary text-secondary-foreground' :
-                            bike.status === 'disabled' ? 'bg-destructive/10 text-destructive border-destructive/20' :
-                            bike.available ? 'bg-accent text-accent-foreground' : ''
-                          }
-                        >
-                          {inUseBikeIds.has(bike.id) ? 'In Use' : 
-                           bike.status === 'maintenance' ? 'Maintenance' :
-                           bike.status === 'disabled' ? 'Disabled' :
-                           bike.available ? 'Available' : 'Maintenance'}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {inUseBikeIds.has(bike.id) ? (
-                            <Badge className="bg-muted text-muted-foreground">Ride Active</Badge>
-                          ) : bike.available ? (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={async () => {
-                                  try {
-                                    await bikesAPI.update(bike.id, { status: 'maintenance' });
-                                    toast({ title: "Marked Maintenance", description: `${bike.name} is now under maintenance.` });
-                                    loadData();
-                                  } catch (e: any) {
-                                    toast({ title: "Error", description: e.message || "Failed to update bike", variant: "destructive" });
-                                  }
-                                }}
-                              >
-                                <Wrench className="h-4 w-4 mr-2" />
-                                Maintenance
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={async () => {
-                                  try {
-                                    await bikesAPI.update(bike.id, { status: 'disabled' });
-                                    toast({ title: "Vehicle Disabled", description: `${bike.name} has been disabled.` });
-                                    loadData();
-                                  } catch (e: any) {
-                                    toast({ title: "Error", description: e.message || "Failed to update bike", variant: "destructive" });
-                                  }
-                                }}
-                              >
-                                Disable
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={async () => {
-                                try {
-                                  await bikesAPI.update(bike.id, { status: 'available' });
-                                  toast({ title: "Enabled", description: `${bike.name} is now available.` });
-                                  loadData();
-                                } catch (e: any) {
-                                  toast({ title: "Error", description: e.message || "Failed to update bike", variant: "destructive" });
-                                }
-                              }}
-                            >
-                              Enable
-                            </Button>
-                          )}
-                        </div>
-                      </td>
+                <table className="w-full min-w-[900px]">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left px-6 py-4 font-medium">Bike</th>
+                      <th className="text-left px-6 py-4 font-medium">Type</th>
+                      <th className="text-left px-6 py-4 font-medium">Price/Hr</th>
+                      <th className="text-left px-6 py-4 font-medium">KM Limit</th>
+                      <th className="text-left px-6 py-4 font-medium">Status</th>
+                      <th className="text-left px-6 py-4 font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredBikes.map((bike) => (
+                      <tr key={bike.id} className="hover:bg-muted/30">
+                        <td className="px-6 py-4 font-medium">{bike.name}</td>
+                        <td className="px-6 py-4 capitalize">{bike.type}</td>
+                        <td className="px-6 py-4">
+                          ₹
+                          {bike.weekdayRate ||
+                            bike.pricePerHour ||
+                            Math.round((bike.price12Hours || 0) / 12)}
+                        </td>
+                        <td className="px-6 py-4">
+                          {bike.kmLimitPerHour
+                            ? `${bike.kmLimitPerHour} km/hr`
+                            : `${bike.kmLimit} km`}
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge
+                            variant={bike.available ? 'default' : 'secondary'}
+                            className={
+                              inUseBikeIds.has(bike.id)
+                                ? 'bg-primary text-primary-foreground'
+                                : bike.status === 'maintenance'
+                                  ? 'bg-secondary text-secondary-foreground'
+                                  : bike.status === 'disabled'
+                                    ? 'bg-destructive/10 text-destructive border-destructive/20'
+                                    : bike.available
+                                      ? 'bg-accent text-accent-foreground'
+                                      : ''
+                            }
+                          >
+                            {inUseBikeIds.has(bike.id)
+                              ? 'In Use'
+                              : bike.status === 'maintenance'
+                                ? 'Maintenance'
+                                : bike.status === 'disabled'
+                                  ? 'Disabled'
+                                  : bike.available
+                                    ? 'Available'
+                                    : 'Maintenance'}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            {inUseBikeIds.has(bike.id) ? (
+                              <Badge className="bg-muted text-muted-foreground">Ride Active</Badge>
+                            ) : bike.available ? (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={async () => {
+                                    try {
+                                      await bikesAPI.update(bike.id, { status: 'maintenance' });
+                                      toast({
+                                        title: 'Marked Maintenance',
+                                        description: `${bike.name} is now under maintenance.`,
+                                      });
+                                      loadData();
+                                    } catch (e: any) {
+                                      toast({
+                                        title: 'Error',
+                                        description: e.message || 'Failed to update bike',
+                                        variant: 'destructive',
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <Wrench className="h-4 w-4 mr-2" />
+                                  Maintenance
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={async () => {
+                                    try {
+                                      await bikesAPI.update(bike.id, { status: 'disabled' });
+                                      toast({
+                                        title: 'Vehicle Disabled',
+                                        description: `${bike.name} has been disabled.`,
+                                      });
+                                      loadData();
+                                    } catch (e: any) {
+                                      toast({
+                                        title: 'Error',
+                                        description: e.message || 'Failed to update bike',
+                                        variant: 'destructive',
+                                      });
+                                    }
+                                  }}
+                                >
+                                  Disable
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={async () => {
+                                  try {
+                                    await bikesAPI.update(bike.id, { status: 'available' });
+                                    toast({
+                                      title: 'Enabled',
+                                      description: `${bike.name} is now available.`,
+                                    });
+                                    loadData();
+                                  } catch (e: any) {
+                                    toast({
+                                      title: 'Error',
+                                      description: e.message || 'Failed to update bike',
+                                      variant: 'destructive',
+                                    });
+                                  }
+                                }}
+                              >
+                                Enable
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -1142,32 +1400,34 @@ export default function Admin() {
               <div>
                 <h1 className="text-xl sm:text-2xl font-display font-bold mb-2">All Vehicles</h1>
                 <p className="text-muted-foreground">
-                  Add, edit, or remove vehicles from {selectedLocationId && locations.find(loc => loc.id === selectedLocationId) 
-                    ? formatLocationDisplay(locations.find(loc => loc.id === selectedLocationId)) 
-                    : 'your location'}.
+                  Add, edit, or remove vehicles from{' '}
+                  {selectedLocationId && locations.find((loc) => loc.id === selectedLocationId)
+                    ? formatLocationDisplay(locations.find((loc) => loc.id === selectedLocationId))
+                    : 'your location'}
+                  .
                 </p>
               </div>
               <Button
                 className="w-full sm:w-auto"
                 onClick={() => {
                   setEditingBike(null);
-                  setBikeForm({ 
-                    name: '', 
-                    brand: '', 
-                    type: 'fuel', 
+                  setBikeForm({
+                    name: '',
+                    brand: '',
+                    type: 'fuel',
                     category: 'midrange',
-                    pricePerHour: '', 
+                    pricePerHour: '',
                     price12Hours: '',
                     pricePerWeek: '',
-                    kmLimit: '', 
-                    locationId: currentUser?.role === 'superadmin' ? '' : (selectedLocationId || ''), 
+                    kmLimit: '',
+                    locationId: currentUser?.role === 'superadmin' ? '' : selectedLocationId || '',
                     image: '',
                     images: ['', '', ''],
                     weekdayRate: '',
                     weekendRate: '',
                     excessKmCharge: '',
                     kmLimitPerHour: '',
-                    minBookingHours: ''
+                    minBookingHours: '',
                   });
                   setBikeDialogOpen(true);
                 }}
@@ -1181,8 +1441,8 @@ export default function Admin() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <div className="w-full flex items-center gap-2 sm:flex-1">
                     <Search className="h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="Search vehicles..." 
+                    <Input
+                      placeholder="Search vehicles..."
                       value={allVehiclesSearchQuery}
                       onChange={(e) => setAllVehiclesSearchQuery(e.target.value)}
                     />
@@ -1193,10 +1453,12 @@ export default function Admin() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Brands</SelectItem>
-                      {Array.from(new Set(bikes.map((b) => ((b.brand || '').trim() || 'Unbranded'))))
+                      {Array.from(new Set(bikes.map((b) => (b.brand || '').trim() || 'Unbranded')))
                         .sort()
                         .map((brand) => (
-                          <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                          <SelectItem key={brand} value={brand}>
+                            {brand}
+                          </SelectItem>
                         ))}
                     </SelectContent>
                   </Select>
@@ -1205,326 +1467,421 @@ export default function Admin() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4">
                 {bikes
                   .filter((bike) => {
-                    const matchesSearch = allVehiclesSearchQuery === '' || 
+                    const matchesSearch =
+                      allVehiclesSearchQuery === '' ||
                       bike.name.toLowerCase().includes(allVehiclesSearchQuery.toLowerCase()) ||
-                      (bike.brand && bike.brand.toLowerCase().includes(allVehiclesSearchQuery.toLowerCase()));
-                    const matchesBrand = selectedBrandFilter === 'all' || 
+                      (bike.brand &&
+                        bike.brand.toLowerCase().includes(allVehiclesSearchQuery.toLowerCase()));
+                    const matchesBrand =
+                      selectedBrandFilter === 'all' ||
                       ((bike.brand || '').trim() || 'Unbranded') === selectedBrandFilter;
                     return matchesSearch && matchesBrand;
                   })
                   .map((bike) => (
-                  <div key={bike.id} className="border rounded-lg p-2 sm:p-3 flex flex-col bg-card h-full min-w-0">
-                    {bike.image && (
-                      <div className="relative mb-2 h-32 sm:h-40 md:h-48 bg-muted rounded-md overflow-hidden flex items-center justify-center flex-shrink-0">
-                        <img 
-                          src={bike.image} 
-                          alt={`Admin view of ${bike.name}`} 
-                          className="max-w-full max-h-full object-contain rounded-md"
-                          style={{ imageRendering: 'auto' as const }}
-                        />
-                        <Badge variant="secondary" className="absolute top-2 right-2 text-xs">{bike.type}</Badge>
-                      </div>
-                    )}
-                    {!bike.image && (
-                      <div className="relative mb-2 bg-muted rounded-md h-32 sm:h-40 md:h-48 flex items-center justify-center flex-shrink-0">
-                        <Badge variant="secondary" className="absolute top-2 right-2 text-xs">{bike.type}</Badge>
-                        <Bike className="h-12 w-12 text-muted-foreground/50" />
-                      </div>
-                    )}
-                    <div className="flex-1 flex flex-col min-w-0">
-                      <p className="font-medium mb-1 whitespace-normal">{bike.name}</p>
-                      {(bike.brand || bike.year) && (
-                        <p className="text-xs text-muted-foreground mb-2 truncate">
-                          {[bike.brand ? `Brand: ${bike.brand}` : '', bike.year ? `Year: ${bike.year}` : ''].filter(Boolean).join(' • ')}
-                        </p>
+                    <div
+                      key={bike.id}
+                      className="border rounded-lg p-2 sm:p-3 flex flex-col bg-card h-full min-w-0"
+                    >
+                      {bike.image && (
+                        <div className="relative mb-2 h-32 sm:h-40 md:h-48 bg-muted rounded-md overflow-hidden flex items-center justify-center flex-shrink-0">
+                          <img
+                            src={bike.image}
+                            alt={`Admin view of ${bike.name}`}
+                            className="max-w-full max-h-full object-contain rounded-md"
+                            style={{ imageRendering: 'auto' as const }}
+                          />
+                          <Badge variant="secondary" className="absolute top-2 right-2 text-xs">
+                            {bike.type}
+                          </Badge>
+                        </div>
                       )}
-                      <div className="mt-auto flex items-center justify-between pt-2 gap-2">
-                        <p className="text-sm font-semibold text-foreground whitespace-nowrap">₹{bike.weekdayRate || bike.pricePerHour || Math.round((bike.price12Hours || 0) / 12)}/hr</p>
-                        <div className="flex gap-1 flex-shrink-0">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => {
-                              setEditingBike(bike);
-                              setBikeForm({
-                                name: bike.name,
-                                brand: bike.brand || '',
-                                year: bike.year ? String(bike.year) : '',
-                                type: bike.type,
-                                category: bike.category || 'midrange',
-                                pricePerHour: String(bike.pricePerHour || ''),
-                                price12Hours: String(bike.price12Hours || ''),
-                                pricePerWeek: String(bike.pricePerWeek || ''),
-                                kmLimit: String(bike.kmLimit),
-                                locationId: currentUser?.role === 'superadmin' ? bike.locationId : (selectedLocationId || bike.locationId),
-                                image: bike.image || '',
-                                images: bike.images && bike.images.length > 0 ? [...bike.images, '', '', ''].slice(0, 3) : ['', '', ''],
-                                weekdayRate: String(bike.weekdayRate || ''),
-                                weekendRate: String(bike.weekendRate || ''),
-                                excessKmCharge: String(bike.excessKmCharge || ''),
-                                kmLimitPerHour: String(bike.kmLimitPerHour || ''),
-                                minBookingHours: String(bike.minBookingHours || ''),
-                                gstPercentage: bike.gstPercentage !== undefined && bike.gstPercentage !== null ? String(bike.gstPercentage) : '18'
-                              });
-                              setBikeDialogOpen(true);
-                            }}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="h-7 px-2 text-xs"
-                            onClick={async () => {
-                              if (window.confirm(`Are you sure you want to delete ${bike.name}? This action cannot be undone.`)) {
-                                try {
-                                  await bikesAPI.delete(bike.id);
-                                  toast({ title: 'Vehicle deleted' });
-                                  loadData();
-                                } catch (e: any) {
-                                  toast({ title: 'Error', description: e.message || 'Failed to delete vehicle', variant: 'destructive' });
+                      {!bike.image && (
+                        <div className="relative mb-2 bg-muted rounded-md h-32 sm:h-40 md:h-48 flex items-center justify-center flex-shrink-0">
+                          <Badge variant="secondary" className="absolute top-2 right-2 text-xs">
+                            {bike.type}
+                          </Badge>
+                          <Bike className="h-12 w-12 text-muted-foreground/50" />
+                        </div>
+                      )}
+                      <div className="flex-1 flex flex-col min-w-0">
+                        <p className="font-medium mb-1 whitespace-normal">{bike.name}</p>
+                        {(bike.brand || bike.year) && (
+                          <p className="text-xs text-muted-foreground mb-2 truncate">
+                            {[
+                              bike.brand ? `Brand: ${bike.brand}` : '',
+                              bike.year ? `Year: ${bike.year}` : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' • ')}
+                          </p>
+                        )}
+                        <div className="mt-auto flex items-center justify-between pt-2 gap-2">
+                          <p className="text-sm font-semibold text-foreground whitespace-nowrap">
+                            ₹
+                            {bike.weekdayRate ||
+                              bike.pricePerHour ||
+                              Math.round((bike.price12Hours || 0) / 12)}
+                            /hr
+                          </p>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => {
+                                setEditingBike(bike);
+                                setBikeForm({
+                                  name: bike.name,
+                                  brand: bike.brand || '',
+                                  year: bike.year ? String(bike.year) : '',
+                                  type: bike.type,
+                                  category: bike.category || 'midrange',
+                                  pricePerHour: String(bike.pricePerHour || ''),
+                                  price12Hours: String(bike.price12Hours || ''),
+                                  pricePerWeek: String(bike.pricePerWeek || ''),
+                                  kmLimit: String(bike.kmLimit),
+                                  locationId:
+                                    currentUser?.role === 'superadmin'
+                                      ? bike.locationId
+                                      : selectedLocationId || bike.locationId,
+                                  image: bike.image || '',
+                                  images:
+                                    bike.images && bike.images.length > 0
+                                      ? [...bike.images, '', '', ''].slice(0, 3)
+                                      : ['', '', ''],
+                                  weekdayRate: String(bike.weekdayRate || ''),
+                                  weekendRate: String(bike.weekendRate || ''),
+                                  excessKmCharge: String(bike.excessKmCharge || ''),
+                                  kmLimitPerHour: String(bike.kmLimitPerHour || ''),
+                                  minBookingHours: String(bike.minBookingHours || ''),
+                                  gstPercentage:
+                                    bike.gstPercentage !== undefined && bike.gstPercentage !== null
+                                      ? String(bike.gstPercentage)
+                                      : '18',
+                                });
+                                setBikeDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-7 px-2 text-xs"
+                              onClick={async () => {
+                                if (
+                                  window.confirm(
+                                    `Are you sure you want to delete ${bike.name}? This action cannot be undone.`
+                                  )
+                                ) {
+                                  try {
+                                    await bikesAPI.delete(bike.id);
+                                    toast({ title: 'Vehicle deleted' });
+                                    loadData();
+                                  } catch (e: any) {
+                                    toast({
+                                      title: 'Error',
+                                      description: e.message || 'Failed to delete vehicle',
+                                      variant: 'destructive',
+                                    });
+                                  }
                                 }
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           </div>
         )}
 
         {/* Bookings */}
-        {activeTab === 'bookings' && (() => {
-          // Filter bookings based on search query
-          const filteredBookings = bookingSearchQuery.trim() === '' 
-            ? rentalsForLocation 
-            : rentalsForLocation.filter((r) => {
-                const bike = bikesById[r.bikeId] || r.bike;
-                const user = users.find(u => u.id === r.userId) || r.user;
-                const searchLower = bookingSearchQuery.toLowerCase();
-                // Strip '#' from search query for ID matching
-                const searchId = searchLower.startsWith('#') ? searchLower.slice(1) : searchLower;
-                
-                return (
-                  r.id.toLowerCase().includes(searchId) ||
-                  (bike?.name || '').toLowerCase().includes(searchLower) ||
-                  (user?.name || '').toLowerCase().includes(searchLower) ||
-                  (user?.email || '').toLowerCase().includes(searchLower) ||
-                  r.status.toLowerCase().includes(searchLower) ||
-                  (r.pickupTime || r.startTime || '').toLowerCase().includes(searchLower) ||
-                  (r.dropoffTime || r.endTime || '').toLowerCase().includes(searchLower)
-                );
-              });
+        {activeTab === 'bookings' &&
+          (() => {
+            // Filter bookings based on search query
+            const filteredBookings =
+              bookingSearchQuery.trim() === ''
+                ? rentalsForLocation
+                : rentalsForLocation.filter((r) => {
+                    const bike = bikesById[r.bikeId] || r.bike;
+                    const user = users.find((u) => u.id === r.userId) || r.user;
+                    const searchLower = bookingSearchQuery.toLowerCase();
+                    // Strip '#' from search query for ID matching
+                    const searchId = searchLower.startsWith('#')
+                      ? searchLower.slice(1)
+                      : searchLower;
 
-          return (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-display font-bold mb-2">Bookings</h1>
-              <p className="text-muted-foreground">
-                Manage bookings in {selectedLocationId && locations.find(loc => loc.id === selectedLocationId) 
-                  ? formatLocationDisplay(locations.find(loc => loc.id === selectedLocationId)) 
-                  : 'your location'}.
-              </p>
-            </div>
+                    return (
+                      r.id.toLowerCase().includes(searchId) ||
+                      (bike?.name || '').toLowerCase().includes(searchLower) ||
+                      (user?.name || '').toLowerCase().includes(searchLower) ||
+                      (user?.email || '').toLowerCase().includes(searchLower) ||
+                      r.status.toLowerCase().includes(searchLower) ||
+                      (r.pickupTime || r.startTime || '').toLowerCase().includes(searchLower) ||
+                      (r.dropoffTime || r.endTime || '').toLowerCase().includes(searchLower)
+                    );
+                  });
 
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Search bookings..."
-                className="pl-10"
-                value={bookingSearchQuery}
-                onChange={(e) => setBookingSearchQuery(e.target.value)}
-              />
-            </div>
+            return (
+              <div className="space-y-6">
+                <div>
+                  <h1 className="text-2xl font-display font-bold mb-2">Bookings</h1>
+                  <p className="text-muted-foreground">
+                    Manage bookings in{' '}
+                    {selectedLocationId && locations.find((loc) => loc.id === selectedLocationId)
+                      ? formatLocationDisplay(
+                          locations.find((loc) => loc.id === selectedLocationId)
+                        )
+                      : 'your location'}
+                    .
+                  </p>
+                </div>
 
-            <div className="bg-card rounded-2xl shadow-card overflow-hidden">
-              <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-[1200px]">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left px-6 py-4 font-medium">Booking</th>
-                    <th className="text-left px-6 py-4 font-medium">Bike</th>
-                    <th className="text-left px-6 py-4 font-medium">User</th>
-                    <th className="text-left px-6 py-4 font-medium">Start</th>
-                    <th className="text-left px-6 py-4 font-medium">End</th>
-                    <th className="text-left px-6 py-4 font-medium">Status</th>
-                    <th className="text-left px-6 py-4 font-medium">Booking Price</th>
-                    <th className="text-left px-6 py-4 font-medium">Extras</th>
-                    <th className="text-left px-6 py-4 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredBookings.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-6 py-12 text-center">
-                        <div className="flex flex-col items-center justify-center">
-                          <CalendarIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                          <p className="text-lg font-medium text-muted-foreground mb-2">
-                            {bookingSearchQuery.trim() ? 'No bookings match your search' : 'No bookings found'}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {bookingSearchQuery.trim() 
-                              ? 'Try adjusting your search terms.' 
-                              : 'There are no bookings for your location yet.'}
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredBookings.map((r) => {
-                      const bike = bikesById[r.bikeId] || r.bike;
-                      const user = users.find(u => u.id === r.userId) || r.user;
-                      // Calculate booking price (initial payment) and extras (additional charges)
-                      const bookingPrice = r.totalAmount || 0;
-                      const totalCost = r.totalCost || 0;
-                      const extras = totalCost > bookingPrice ? totalCost - bookingPrice : 0;
-                      
-                      return (
-                        <tr key={r.id} className="hover:bg-muted/30">
-                          <td className="px-6 py-4 font-medium">#{r.id.slice(0,8)}</td>
-                          <td className="px-6 py-4">{bike?.name || r.bikeId}</td>
-                          <td className="px-6 py-4">{user?.name || r.userId}</td>
-                          <td className="px-6 py-4">{new Date(r.pickupTime || r.startTime).toLocaleString()}</td>
-                          <td className="px-6 py-4">{r.dropoffTime || r.endTime ? new Date(r.dropoffTime || r.endTime).toLocaleString() : '-'}</td>
-                          <td className="px-6 py-4">
-                            <Badge className={statusStyles[r.status as keyof typeof statusStyles]?.color || 'bg-muted'}>
-                              {r.status}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="font-medium">₹{bookingPrice.toFixed(2)}</span>
-                          </td>
-                          <td className="px-6 py-4">
-                            {extras > 0 ? (
-                              <span className="font-medium text-primary">₹{extras.toFixed(2)}</span>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  const bike = bikesById[r.bikeId] || r.bike;
-                                  const imgs = Array.isArray(r.userImages) && r.userImages.length > 0
-                                    ? r.userImages
-                                    : (bike?.image ? [bike.image] : []);
-                                  setSelectedRentalImages(imgs);
-                                  setViewImagesDialog(true);
-                                }}
-                                title="View User Images"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              {r.status === 'confirmed' && (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={async () => {
-                                      try {
-                                        await rentalsAPI.cancel(r.id);
-                                        toast({ title: "Booking Cancelled", description: "Booking cancelled successfully." });
-                                        loadData();
-                                      } catch (e: any) {
-                                        toast({ title: "Error", description: e.message || "Failed to cancel", variant: "destructive" });
-                                      }
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </>
-                              )}
-                              {(r.status === 'ongoing' || r.status === 'active') && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    const now = new Date();
-                                    const actualReturnTime = toLocalISOString(now);
-                                    const scheduledEndTimeStr = r.dropoffTime || r.endTime || '';
-                                    let delay = '';
+                <div className="relative max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    placeholder="Search bookings..."
+                    className="pl-10"
+                    value={bookingSearchQuery}
+                    onChange={(e) => setBookingSearchQuery(e.target.value)}
+                  />
+                </div>
 
-                                    if (scheduledEndTimeStr) {
-                                      const scheduled = new Date(scheduledEndTimeStr);
-                                      const actual = new Date(actualReturnTime);
-                                      const diffMs = actual.getTime() - scheduled.getTime();
-                                      const diffMins = Math.floor(diffMs / 60000);
-                                      // Store delay in HOURS in UI.
-                                      delay = diffMins > 0 ? (diffMins / 60).toFixed(2) : '0';
-                                    }
-
-                                    const bookingStartDate = new Date(r.startTime);
-                                    
-                                    const bike = bikesById[r.bikeId] || r.bike;
-                                    setEndRideData({ 
-                                      id: r.id,
-                                      bikeId: r.bikeId,
-                                      startKm: '', 
-                                      endKm: '', 
-                                      delay,
-                                      startTime: bookingStartDate.toLocaleString(),
-                                      endTime: r.dropoffTime || r.endTime ? new Date(r.dropoffTime || r.endTime).toLocaleString() : '-',
-                                      actualReturnTime,
-                                      scheduledEndTime: scheduledEndTimeStr,
-                                      rawStartTime: toLocalISOString(bookingStartDate),
-                                      totalPrice: r.totalCost ? r.totalCost.toString() : ''
-                                    });
-                                    // Set selected date to current date, time to current time
-                                    setSelectedDate(now);
-                                    setSelectedTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
-                                    setSlideValue(0);
-                                    setEndRideDialogOpen(true);
-                                  }}
-                                >
-                                  End Ride
-                                </Button>
-                              )}
-                              {(r.status === 'completed' || r.status === 'cancelled') && (
-                                <Button variant="ghost" size="sm" disabled className="text-muted-foreground">
-                                  No actions available
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
-                                onClick={async () => {
-                                  if (confirm('Are you sure you want to delete this rental? This action cannot be undone.')) {
-                                    try {
-                                      await rentalsAPI.delete(r.id);
-                                      toast({ title: "Rental Deleted", description: "Rental has been deleted successfully." });
-                                      loadData();
-                                    } catch (e: any) {
-                                      toast({ title: "Error", description: e.message || "Failed to delete rental", variant: "destructive" });
-                                    }
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
+                <div className="bg-card rounded-2xl shadow-card overflow-hidden">
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full min-w-[1200px]">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left px-6 py-4 font-medium">Booking</th>
+                          <th className="text-left px-6 py-4 font-medium">Bike</th>
+                          <th className="text-left px-6 py-4 font-medium">User</th>
+                          <th className="text-left px-6 py-4 font-medium">Start</th>
+                          <th className="text-left px-6 py-4 font-medium">End</th>
+                          <th className="text-left px-6 py-4 font-medium">Status</th>
+                          <th className="text-left px-6 py-4 font-medium">Booking Price</th>
+                          <th className="text-left px-6 py-4 font-medium">Extras</th>
+                          <th className="text-left px-6 py-4 font-medium">Actions</th>
                         </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          </div>
-          );
-        })()}
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {filteredBookings.length === 0 ? (
+                          <tr>
+                            <td colSpan={9} className="px-6 py-12 text-center">
+                              <div className="flex flex-col items-center justify-center">
+                                <CalendarIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                                <p className="text-lg font-medium text-muted-foreground mb-2">
+                                  {bookingSearchQuery.trim()
+                                    ? 'No bookings match your search'
+                                    : 'No bookings found'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {bookingSearchQuery.trim()
+                                    ? 'Try adjusting your search terms.'
+                                    : 'There are no bookings for your location yet.'}
+                                </p>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredBookings.map((r) => {
+                            const bike = bikesById[r.bikeId] || r.bike;
+                            const user = users.find((u) => u.id === r.userId) || r.user;
+                            // Calculate booking price (initial payment) and extras (additional charges)
+                            const bookingPrice = r.totalAmount || 0;
+                            const totalCost = r.totalCost || 0;
+                            const extras = totalCost > bookingPrice ? totalCost - bookingPrice : 0;
+
+                            return (
+                              <tr key={r.id} className="hover:bg-muted/30">
+                                <td className="px-6 py-4 font-medium">#{r.id.slice(0, 8)}</td>
+                                <td className="px-6 py-4">{bike?.name || r.bikeId}</td>
+                                <td className="px-6 py-4">{user?.name || r.userId}</td>
+                                <td className="px-6 py-4">
+                                  {new Date(r.pickupTime || r.startTime).toLocaleString()}
+                                </td>
+                                <td className="px-6 py-4">
+                                  {r.dropoffTime || r.endTime
+                                    ? new Date(r.dropoffTime || r.endTime).toLocaleString()
+                                    : '-'}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <Badge
+                                    className={
+                                      statusStyles[r.status as keyof typeof statusStyles]?.color ||
+                                      'bg-muted'
+                                    }
+                                  >
+                                    {r.status}
+                                  </Badge>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="font-medium">₹{bookingPrice.toFixed(2)}</span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  {extras > 0 ? (
+                                    <span className="font-medium text-primary">
+                                      ₹{extras.toFixed(2)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const bike = bikesById[r.bikeId] || r.bike;
+                                        const imgs =
+                                          Array.isArray(r.userImages) && r.userImages.length > 0
+                                            ? r.userImages
+                                            : bike?.image
+                                              ? [bike.image]
+                                              : [];
+                                        setSelectedRentalImages(imgs);
+                                        setViewImagesDialog(true);
+                                      }}
+                                      title="View User Images"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    {r.status === 'confirmed' && (
+                                      <>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={async () => {
+                                            try {
+                                              await rentalsAPI.cancel(r.id);
+                                              toast({
+                                                title: 'Booking Cancelled',
+                                                description: 'Booking cancelled successfully.',
+                                              });
+                                              loadData();
+                                            } catch (e: any) {
+                                              toast({
+                                                title: 'Error',
+                                                description: e.message || 'Failed to cancel',
+                                                variant: 'destructive',
+                                              });
+                                            }
+                                          }}
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </>
+                                    )}
+                                    {(r.status === 'ongoing' || r.status === 'active') && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          const now = new Date();
+                                          const actualReturnTime = toLocalISOString(now);
+                                          const scheduledEndTimeStr =
+                                            r.dropoffTime || r.endTime || '';
+                                          let delay = '';
+
+                                          if (scheduledEndTimeStr) {
+                                            const scheduled = new Date(scheduledEndTimeStr);
+                                            const actual = new Date(actualReturnTime);
+                                            const diffMs = actual.getTime() - scheduled.getTime();
+                                            const diffMins = Math.floor(diffMs / 60000);
+                                            // Store delay in HOURS in UI.
+                                            delay = diffMins > 0 ? (diffMins / 60).toFixed(2) : '0';
+                                          }
+
+                                          const bookingStartDate = new Date(r.startTime);
+
+                                          const bike = bikesById[r.bikeId] || r.bike;
+                                          setEndRideData({
+                                            id: r.id,
+                                            bikeId: r.bikeId,
+                                            startKm: '',
+                                            endKm: '',
+                                            delay,
+                                            startTime: bookingStartDate.toLocaleString(),
+                                            endTime:
+                                              r.dropoffTime || r.endTime
+                                                ? new Date(
+                                                    r.dropoffTime || r.endTime
+                                                  ).toLocaleString()
+                                                : '-',
+                                            actualReturnTime,
+                                            scheduledEndTime: scheduledEndTimeStr,
+                                            rawStartTime: toLocalISOString(bookingStartDate),
+                                            totalPrice: r.totalCost ? r.totalCost.toString() : '',
+                                          });
+                                          // Set selected date to current date, time to current time
+                                          setSelectedDate(now);
+                                          setSelectedTime(
+                                            `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+                                          );
+                                          setSlideValue(0);
+                                          setEndRideDialogOpen(true);
+                                        }}
+                                      >
+                                        End Ride
+                                      </Button>
+                                    )}
+                                    {(r.status === 'completed' || r.status === 'cancelled') && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled
+                                        className="text-muted-foreground"
+                                      >
+                                        No actions available
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive hover:text-destructive"
+                                      onClick={async () => {
+                                        if (
+                                          confirm(
+                                            'Are you sure you want to delete this rental? This action cannot be undone.'
+                                          )
+                                        ) {
+                                          try {
+                                            await rentalsAPI.delete(r.id);
+                                            toast({
+                                              title: 'Rental Deleted',
+                                              description: 'Rental has been deleted successfully.',
+                                            });
+                                            loadData();
+                                          } catch (e: any) {
+                                            toast({
+                                              title: 'Error',
+                                              description: e.message || 'Failed to delete rental',
+                                              variant: 'destructive',
+                                            });
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
         {/* Users */}
         {activeTab === 'users' && (
@@ -1532,9 +1889,11 @@ export default function Admin() {
             <div>
               <h1 className="text-2xl font-display font-bold mb-2">Users</h1>
               <p className="text-muted-foreground">
-                Manage registered users in {selectedLocationId && locations.find(loc => loc.id === selectedLocationId) 
-                  ? formatLocationDisplay(locations.find(loc => loc.id === selectedLocationId)) 
-                  : 'your location'} and their verification status.
+                Manage registered users in{' '}
+                {selectedLocationId && locations.find((loc) => loc.id === selectedLocationId)
+                  ? formatLocationDisplay(locations.find((loc) => loc.id === selectedLocationId))
+                  : 'your location'}{' '}
+                and their verification status.
               </p>
             </div>
 
@@ -1550,55 +1909,65 @@ export default function Admin() {
 
             <div className="bg-card rounded-2xl shadow-card overflow-hidden">
               <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-[900px]">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left px-6 py-4 font-medium">User</th>
-                    <th className="text-left px-6 py-4 font-medium">Role</th>
-                    <th className="text-left px-6 py-4 font-medium">Documents</th>
-                    <th className="text-left px-6 py-4 font-medium">Status</th>
-                    <th className="text-left px-6 py-4 font-medium">Joined</th>
-                    <th className="text-left px-6 py-4 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredUsers.map((user) => {
-                    const docCount = user.documents?.length || 0;
-                    const status = user.isVerified ? 'verified' : docCount > 0 ? 'pending' : 'unverified';
-                    const StatusIcon = statusStyles[status as keyof typeof statusStyles].icon;
-                    return (
-                      <tr key={user.id} className="hover:bg-muted/30">
-                        <td className="px-6 py-4">
-                          <div>
-                            <p className="font-medium">{user.name}</p>
-                            <p className="text-sm text-muted-foreground">{user.email}</p>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                            {user.role}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4">{docCount}</td>
-                        <td className="px-6 py-4">
-                          <Badge className={statusStyles[status as keyof typeof statusStyles].color}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 text-muted-foreground">
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4">
-                          <Button variant="ghost" size="sm" onClick={() => handleViewUser(user.id)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                <table className="w-full min-w-[900px]">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left px-6 py-4 font-medium">User</th>
+                      <th className="text-left px-6 py-4 font-medium">Role</th>
+                      <th className="text-left px-6 py-4 font-medium">Documents</th>
+                      <th className="text-left px-6 py-4 font-medium">Status</th>
+                      <th className="text-left px-6 py-4 font-medium">Joined</th>
+                      <th className="text-left px-6 py-4 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredUsers.map((user) => {
+                      const docCount = user.documents?.length || 0;
+                      const status = user.isVerified
+                        ? 'verified'
+                        : docCount > 0
+                          ? 'pending'
+                          : 'unverified';
+                      const StatusIcon = statusStyles[status as keyof typeof statusStyles].icon;
+                      return (
+                        <tr key={user.id} className="hover:bg-muted/30">
+                          <td className="px-6 py-4">
+                            <div>
+                              <p className="font-medium">{user.name}</p>
+                              <p className="text-sm text-muted-foreground">{user.email}</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                              {user.role}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4">{docCount}</td>
+                          <td className="px-6 py-4">
+                            <Badge
+                              className={statusStyles[status as keyof typeof statusStyles].color}
+                            >
+                              <StatusIcon className="h-3 w-3 mr-1" />
+                              {status.charAt(0).toUpperCase() + status.slice(1)}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 text-muted-foreground">
+                            {new Date(user.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewUser(user.id)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -1610,173 +1979,202 @@ export default function Admin() {
             <div>
               <h1 className="text-2xl font-display font-bold mb-2">User Documents</h1>
               <p className="text-muted-foreground">
-                View user-submitted documents for {selectedLocationId && locations.find(loc => loc.id === selectedLocationId) 
-                  ? formatLocationDisplay(locations.find(loc => loc.id === selectedLocationId)) 
-                  : 'your location'}. Verify and approve documents.
+                View user-submitted documents for{' '}
+                {selectedLocationId && locations.find((loc) => loc.id === selectedLocationId)
+                  ? formatLocationDisplay(locations.find((loc) => loc.id === selectedLocationId))
+                  : 'your location'}
+                . Verify and approve documents.
               </p>
             </div>
 
             <div className="grid gap-4">
               {(() => {
                 // Get unique users who have documents (not just those with rentals)
-                const userIdsWithDocs = new Set(documentsForLocation.map(d => d.userId));
-                const usersWithDocs = users.filter(u => userIdsWithDocs.has(u.id))
-                  .filter(user =>
-                    user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    user.email?.toLowerCase().includes(searchQuery.toLowerCase())
+                const userIdsWithDocs = new Set(documentsForLocation.map((d) => d.userId));
+                const usersWithDocs = users
+                  .filter((u) => userIdsWithDocs.has(u.id))
+                  .filter(
+                    (user) =>
+                      user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      user.email?.toLowerCase().includes(searchQuery.toLowerCase())
                   );
-                
+
                 if (usersWithDocs.length === 0) {
                   return (
-                    <p className="text-muted-foreground text-center py-8">No users with documents found</p>
+                    <p className="text-muted-foreground text-center py-8">
+                      No users with documents found
+                    </p>
                   );
                 }
-                
-                return usersWithDocs.map((user) => {
-                  const userDocs = documentsForLocation.filter(doc => doc.userId === user.id);
-                  if (userDocs.length === 0) return null;
-                  
-                  const pendingCount = userDocs.filter(d => d.status === 'pending').length;
-                  const approvedCount = userDocs.filter(d => d.status === 'approved').length;
-                  const rejectedCount = userDocs.filter(d => d.status === 'rejected').length;
-                  
-                  return (
-                    <div key={user.id} className="bg-card rounded-2xl shadow-card p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Users className="h-6 w-6 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-lg">{user.name}</p>
-                            <p className="text-sm text-muted-foreground">{user.email}</p>
-                            <p className="text-sm text-muted-foreground">{user.mobile || '-'}</p>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
-                              <p className="text-sm">
-                                <span className="text-muted-foreground">Emergency Contact: </span>
-                                <span className="text-foreground">{user.emergencyContact || '-'}</span>
-                              </p>
-                              <p className="text-sm">
-                                <span className="text-muted-foreground">Family Contact: </span>
-                                <span className="text-foreground">{user.familyContact || '-'}</span>
-                              </p>
-                              <p className="text-sm md:col-span-2">
-                                <span className="text-muted-foreground">Permanent Address: </span>
-                                <span className="text-foreground">{user.permanentAddress || '-'}</span>
-                              </p>
-                              <p className="text-sm">
-                                <span className="text-muted-foreground">Current Location: </span>
-                                <span className="text-foreground">{user.currentAddress || '-'}</span>
-                              </p>
-                              <p className="text-sm">
-                                <span className="text-muted-foreground">Hotel Stay: </span>
-                                <span className="text-foreground">{user.hotelStay || '-'}</span>
-                              </p>
+
+                return usersWithDocs
+                  .map((user) => {
+                    const userDocs = documentsForLocation.filter((doc) => doc.userId === user.id);
+                    if (userDocs.length === 0) return null;
+
+                    const pendingCount = userDocs.filter((d) => d.status === 'pending').length;
+                    const approvedCount = userDocs.filter((d) => d.status === 'approved').length;
+                    const rejectedCount = userDocs.filter((d) => d.status === 'rejected').length;
+
+                    return (
+                      <div key={user.id} className="bg-card rounded-2xl shadow-card p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                              <Users className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-lg">{user.name}</p>
+                              <p className="text-sm text-muted-foreground">{user.email}</p>
+                              <p className="text-sm text-muted-foreground">{user.mobile || '-'}</p>
+                              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+                                <p className="text-sm">
+                                  <span className="text-muted-foreground">Emergency Contact: </span>
+                                  <span className="text-foreground">
+                                    {user.emergencyContact || '-'}
+                                  </span>
+                                </p>
+                                <p className="text-sm">
+                                  <span className="text-muted-foreground">Family Contact: </span>
+                                  <span className="text-foreground">
+                                    {user.familyContact || '-'}
+                                  </span>
+                                </p>
+                                <p className="text-sm md:col-span-2">
+                                  <span className="text-muted-foreground">Permanent Address: </span>
+                                  <span className="text-foreground">
+                                    {user.permanentAddress || '-'}
+                                  </span>
+                                </p>
+                                <p className="text-sm">
+                                  <span className="text-muted-foreground">Current Location: </span>
+                                  <span className="text-foreground">
+                                    {user.currentAddress || '-'}
+                                  </span>
+                                </p>
+                                <p className="text-sm">
+                                  <span className="text-muted-foreground">Hotel Stay: </span>
+                                  <span className="text-foreground">{user.hotelStay || '-'}</span>
+                                </p>
+                              </div>
                             </div>
                           </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewUserDocuments(user.id)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Documents
+                          </Button>
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleViewUserDocuments(user.id)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Documents
-                        </Button>
-                      </div>
-                      
-                      <div className="flex gap-4 mb-4">
-                        <Badge variant="outline" className="bg-primary/10">
-                          Total: {userDocs.length}
-                        </Badge>
-                        {pendingCount > 0 && (
-                          <Badge className="bg-primary/10 text-primary">
-                            Pending: {pendingCount}
-                          </Badge>
-                        )}
-                        {approvedCount > 0 && (
-                          <Badge className="bg-accent/10 text-accent">
-                            Approved: {approvedCount}
-                          </Badge>
-                        )}
-                        {rejectedCount > 0 && (
-                          <Badge className="bg-destructive/10 text-destructive">
-                            Rejected: {rejectedCount}
-                          </Badge>
-                        )}
-                      </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {userDocs.map((doc) => {
-                          const StatusIcon = statusStyles[doc.status as keyof typeof statusStyles].icon;
-                          return (
-                            <div key={doc.id} className="border rounded-lg p-3 bg-muted/30">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="min-w-0 flex-1 mr-2">
-                                  <p className="text-xs font-medium truncate">{doc.type.replace('_', ' ')}</p>
-                                </div>
-                                <Badge className={statusStyles[doc.status as keyof typeof statusStyles].color} variant="outline">
-                                  <StatusIcon className="h-3 w-3 mr-1" />
-                                  {doc.status}
-                                </Badge>
-                              </div>
-                              
-                              {/* Document Preview */}
-                              <div 
-                                className="mb-2 border rounded-lg overflow-hidden bg-background cursor-pointer hover:bg-muted/50 transition-colors"
-                                onClick={() => {
-                                  if (doc.url) {
-                                    setPreviewImageUrl(doc.url);
-                                    setIsPreviewModalOpen(true);
-                                  }
-                                }}
-                              >
-                                {doc.url ? (
-                                  <img 
-                                    src={doc.url} 
-                                    alt={doc.name}
-                                    className="w-full h-24 object-contain"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).src = '/documents/placeholder.pdf';
-                                    }}
-                                  />
-                                ) : (
-                                  <div className="w-full h-24 flex items-center justify-center">
-                                    <FileText className="h-8 w-8 text-muted-foreground/30" />
+                        <div className="flex gap-4 mb-4">
+                          <Badge variant="outline" className="bg-primary/10">
+                            Total: {userDocs.length}
+                          </Badge>
+                          {pendingCount > 0 && (
+                            <Badge className="bg-primary/10 text-primary">
+                              Pending: {pendingCount}
+                            </Badge>
+                          )}
+                          {approvedCount > 0 && (
+                            <Badge className="bg-accent/10 text-accent">
+                              Approved: {approvedCount}
+                            </Badge>
+                          )}
+                          {rejectedCount > 0 && (
+                            <Badge className="bg-destructive/10 text-destructive">
+                              Rejected: {rejectedCount}
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {userDocs.map((doc) => {
+                            const StatusIcon =
+                              statusStyles[doc.status as keyof typeof statusStyles].icon;
+                            return (
+                              <div key={doc.id} className="border rounded-lg p-3 bg-muted/30">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="min-w-0 flex-1 mr-2">
+                                    <p className="text-xs font-medium truncate">
+                                      {doc.type.replace('_', ' ')}
+                                    </p>
                                   </div>
-                                )}
-                              </div>
-
-                              <div className="flex gap-2 justify-center mt-2">
-                                {doc.status !== 'rejected' && (
-                                  <Button 
-                                    size="sm" 
+                                  <Badge
+                                    className={
+                                      statusStyles[doc.status as keyof typeof statusStyles].color
+                                    }
                                     variant="outline"
-                                    className="h-7 px-2 text-[10px] text-destructive hover:text-destructive flex-1"
-                                    onClick={() => handleDocumentAction(doc.id || doc._id, 'reject')}
                                   >
-                                    <XCircle className="h-3 w-3 mr-1" />
-                                    Reject
-                                  </Button>
-                                )}
-                                {doc.status !== 'approved' && (
-                                  <Button 
-                                    size="sm"
-                                    className="h-7 px-2 text-[10px] bg-accent hover:bg-accent/90 flex-1"
-                                    onClick={() => handleDocumentAction(doc.id || doc._id, 'approve')}
-                                  >
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Approve
-                                  </Button>
-                                )}
+                                    <StatusIcon className="h-3 w-3 mr-1" />
+                                    {doc.status}
+                                  </Badge>
+                                </div>
+
+                                {/* Document Preview */}
+                                <div
+                                  className="mb-2 border rounded-lg overflow-hidden bg-background cursor-pointer hover:bg-muted/50 transition-colors"
+                                  onClick={() => {
+                                    if (doc.url) {
+                                      setPreviewImageUrl(doc.url);
+                                      setIsPreviewModalOpen(true);
+                                    }
+                                  }}
+                                >
+                                  {doc.url ? (
+                                    <img
+                                      src={doc.url}
+                                      alt={doc.name}
+                                      className="w-full h-24 object-contain"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src =
+                                          '/documents/placeholder.pdf';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-24 flex items-center justify-center">
+                                      <FileText className="h-8 w-8 text-muted-foreground/30" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex gap-2 justify-center mt-2">
+                                  {doc.status !== 'rejected' && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-[10px] text-destructive hover:text-destructive flex-1"
+                                      onClick={() =>
+                                        handleDocumentAction(doc.id || doc._id, 'reject')
+                                      }
+                                    >
+                                      <XCircle className="h-3 w-3 mr-1" />
+                                      Reject
+                                    </Button>
+                                  )}
+                                  {doc.status !== 'approved' && (
+                                    <Button
+                                      size="sm"
+                                      className="h-7 px-2 text-[10px] bg-accent hover:bg-accent/90 flex-1"
+                                      onClick={() =>
+                                        handleDocumentAction(doc.id || doc._id, 'approve')
+                                      }
+                                    >
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Approve
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                }).filter(Boolean);
+                    );
+                  })
+                  .filter(Boolean);
               })()}
             </div>
           </div>
@@ -1791,17 +2189,13 @@ export default function Admin() {
             </div>
 
             <div className="bg-card rounded-2xl shadow-card p-6">
-              <p className="text-muted-foreground text-center py-8">
-                Settings panel coming soon.
-              </p>
+              <p className="text-muted-foreground text-center py-8">Settings panel coming soon.</p>
             </div>
           </div>
         )}
 
         {/* Support */}
-        {activeTab === 'support' && (
-          <SupportManager />
-        )}
+        {activeTab === 'support' && <SupportManager />}
       </main>
 
       {/* Vehicle Create/Edit Dialog */}
@@ -1815,67 +2209,88 @@ export default function Admin() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Brand</Label>
-                <Select 
-                  value={bikeForm.brand} 
+                <Select
+                  value={bikeForm.brand}
                   onValueChange={(v) => {
                     setBikeForm({ ...bikeForm, brand: v, name: '' });
                   }}
                 >
-                  <SelectTrigger><SelectValue placeholder="Select Brand" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Brand" />
+                  </SelectTrigger>
                   <SelectContent>
                     {bikeSpecs.map((spec) => (
-                      <SelectItem key={spec.brand} value={spec.brand}>{spec.brand}</SelectItem>
+                      <SelectItem key={spec.brand} value={spec.brand}>
+                        {spec.brand}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Vehicle Name</Label>
-                <Select 
-                  value={bikeForm.name} 
+                <Select
+                  value={bikeForm.name}
                   onValueChange={(v) => setBikeForm({ ...bikeForm, name: v })}
                   disabled={!bikeForm.brand}
                 >
-                  <SelectTrigger><SelectValue placeholder="Select Vehicle" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Vehicle" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {(bikeSpecs.find(s => s.brand === bikeForm.brand)?.models || []).map((model: string) => (
-                      <SelectItem key={model} value={model}>{model}</SelectItem>
-                    ))}
+                    {(bikeSpecs.find((s) => s.brand === bikeForm.brand)?.models || []).map(
+                      (model: string) => (
+                        <SelectItem key={model} value={model}>
+                          {model}
+                        </SelectItem>
+                      )
+                    )}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-2">
               <Label>Year</Label>
-              <Select 
-                value={bikeForm.year} 
+              <Select
+                value={bikeForm.year}
                 onValueChange={(v) => setBikeForm({ ...bikeForm, year: v })}
               >
-                <SelectTrigger><SelectValue placeholder="Select Year" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Year" />
+                </SelectTrigger>
                 <SelectContent>
                   {Array.from({ length: new Date().getFullYear() - 2000 + 1 }, (_, i) => 2000 + i)
                     .reverse()
                     .map((year) => (
-                      <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
                     ))}
                 </SelectContent>
               </Select>
             </div>
-            <Select value={bikeForm.type} onValueChange={(v) => setBikeForm({ ...bikeForm, type: v })}>
-              <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+            <Select
+              value={bikeForm.type}
+              onValueChange={(v) => setBikeForm({ ...bikeForm, type: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="fuel">Fuel</SelectItem>
                 <SelectItem value="electric">Electric</SelectItem>
                 <SelectItem value="scooter">Scooter</SelectItem>
               </SelectContent>
             </Select>
-            <Select 
-              value={bikeForm.category || 'midrange'} 
+            <Select
+              value={bikeForm.category || 'midrange'}
               onValueChange={(v) => {
                 setBikeForm({ ...bikeForm, category: v as 'budget' | 'midrange' | 'topend' });
               }}
             >
-              <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="budget">Budget</SelectItem>
                 <SelectItem value="midrange">Mid Range</SelectItem>
@@ -1883,69 +2298,74 @@ export default function Admin() {
               </SelectContent>
             </Select>
 
-
             <div className="space-y-2">
               <Label className="text-sm font-medium">Tariff Configuration (Admin Only)</Label>
               <div className="grid grid-cols-2 gap-2">
-                <Input 
-                  placeholder="Weekday Rate (₹/hr)" 
+                <Input
+                  placeholder="Weekday Rate (₹/hr)"
                   type="number"
-                  value={bikeForm.weekdayRate} 
-                  onChange={(e) => setBikeForm({ ...bikeForm, weekdayRate: e.target.value })} 
+                  value={bikeForm.weekdayRate}
+                  onChange={(e) => setBikeForm({ ...bikeForm, weekdayRate: e.target.value })}
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 />
-                <Input 
-                  placeholder="Weekend Rate (₹/hr)" 
+                <Input
+                  placeholder="Weekend Rate (₹/hr)"
                   type="number"
-                  value={bikeForm.weekendRate} 
-                  onChange={(e) => setBikeForm({ ...bikeForm, weekendRate: e.target.value })} 
+                  value={bikeForm.weekendRate}
+                  onChange={(e) => setBikeForm({ ...bikeForm, weekendRate: e.target.value })}
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 />
-                <Input 
-                  placeholder="Excess KM Charge (₹/km)" 
+                <Input
+                  placeholder="Excess KM Charge (₹/km)"
                   type="number"
-                  value={bikeForm.excessKmCharge} 
-                  onChange={(e) => setBikeForm({ ...bikeForm, excessKmCharge: e.target.value })} 
+                  value={bikeForm.excessKmCharge}
+                  onChange={(e) => setBikeForm({ ...bikeForm, excessKmCharge: e.target.value })}
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 />
-                <Input 
-                  placeholder="KM Limit Per Hour" 
+                <Input
+                  placeholder="KM Limit Per Hour"
                   type="number"
-                  value={bikeForm.kmLimitPerHour} 
-                  onChange={(e) => setBikeForm({ ...bikeForm, kmLimitPerHour: e.target.value })} 
+                  value={bikeForm.kmLimitPerHour}
+                  onChange={(e) => setBikeForm({ ...bikeForm, kmLimitPerHour: e.target.value })}
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 />
-                <Input 
-                  placeholder="KM Limit" 
+                <Input
+                  placeholder="KM Limit"
                   type="number"
-                  value={bikeForm.kmLimit} 
-                  onChange={(e) => setBikeForm({ ...bikeForm, kmLimit: e.target.value })} 
+                  value={bikeForm.kmLimit}
+                  onChange={(e) => setBikeForm({ ...bikeForm, kmLimit: e.target.value })}
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 />
-                <Input 
-                  placeholder="Min Booking Hours" 
+                <Input
+                  placeholder="Min Booking Hours"
                   type="number"
-                  value={bikeForm.minBookingHours} 
-                  onChange={(e) => setBikeForm({ ...bikeForm, minBookingHours: e.target.value })} 
+                  value={bikeForm.minBookingHours}
+                  onChange={(e) => setBikeForm({ ...bikeForm, minBookingHours: e.target.value })}
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 />
-                <Input 
-                  placeholder="GST Percentage (%)" 
+                <Input
+                  placeholder="GST Percentage (%)"
                   type="number"
-                  value={bikeForm.gstPercentage} 
-                  onChange={(e) => setBikeForm({ ...bikeForm, gstPercentage: e.target.value })} 
+                  value={bikeForm.gstPercentage}
+                  onChange={(e) => setBikeForm({ ...bikeForm, gstPercentage: e.target.value })}
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 />
               </div>
             </div>
 
-
             {currentUser?.role === 'superadmin' && (
-              <Select value={bikeForm.locationId} onValueChange={(v) => setBikeForm({ ...bikeForm, locationId: v })}>
-                <SelectTrigger><SelectValue placeholder="Location" /></SelectTrigger>
+              <Select
+                value={bikeForm.locationId}
+                onValueChange={(v) => setBikeForm({ ...bikeForm, locationId: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Location" />
+                </SelectTrigger>
                 <SelectContent>
                   {locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id}>{formatLocationDisplay(loc)}</SelectItem>
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {formatLocationDisplay(loc)}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1955,10 +2375,10 @@ export default function Admin() {
               <div className="flex gap-4 items-start">
                 <BikeImagePreview url={bikeForm.image} label="Main vehicle preview" />
                 <div className="flex-1 space-y-2">
-                  <Input 
-                    placeholder="Enter Image URL" 
-                    value={bikeForm.image} 
-                    onChange={(e) => setBikeForm({ ...bikeForm, image: e.target.value })} 
+                  <Input
+                    placeholder="Enter Image URL"
+                    value={bikeForm.image}
+                    onChange={(e) => setBikeForm({ ...bikeForm, image: e.target.value })}
                   />
                   <div className="relative">
                     <Input
@@ -1972,12 +2392,23 @@ export default function Admin() {
                           const res = await documentsAPI.uploadFile(file, file.name, 'bike_image');
                           if (res?.fileUrl) {
                             setBikeForm({ ...bikeForm, image: res.fileUrl });
-                            toast({ title: 'Image uploaded', description: 'Vehicle image has been uploaded' });
+                            toast({
+                              title: 'Image uploaded',
+                              description: 'Vehicle image has been uploaded',
+                            });
                           } else {
-                            toast({ title: 'Upload failed', description: 'No file URL returned', variant: 'destructive' });
+                            toast({
+                              title: 'Upload failed',
+                              description: 'No file URL returned',
+                              variant: 'destructive',
+                            });
                           }
                         } catch (err: any) {
-                          toast({ title: 'Upload error', description: err.message || 'Failed to upload image', variant: 'destructive' });
+                          toast({
+                            title: 'Upload error',
+                            description: err.message || 'Failed to upload image',
+                            variant: 'destructive',
+                          });
                         }
                       }}
                     />
@@ -1985,7 +2416,9 @@ export default function Admin() {
                       <Download className="h-4 w-4" />
                     </div>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">Tip: Click image to see larger preview</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Tip: Click image to see larger preview
+                  </p>
                 </div>
               </div>
             </div>
@@ -1993,66 +2426,78 @@ export default function Admin() {
             {/* Additional Images */}
             <div className="space-y-4 border-t pt-4">
               <Label className="text-sm font-medium">Additional Images (Optional)</Label>
-              {bikeForm.images && bikeForm.images.map((img: string, index: number) => (
-                <div key={index} className="space-y-3 p-3 border rounded-xl bg-muted/20 relative">
-                   <div className="flex items-center justify-between">
-                     <Label className="text-xs font-semibold">Image Slot {index + 1}</Label>
-                     {img && (
-                       <Button 
-                         variant="ghost" 
-                         size="sm" 
-                         className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10" 
-                         onClick={() => {
-                           const newImages = [...bikeForm.images];
-                           newImages[index] = '';
-                           setBikeForm({ ...bikeForm, images: newImages });
-                         }}
-                       >
-                         <X className="h-3 w-3" />
-                       </Button>
-                     )}
-                   </div>
-                   <div className="flex gap-4 items-start">
-                    <BikeImagePreview url={img} label={`Additional preview ${index + 1}`} />
-                    <div className="flex-1 space-y-2">
-                      <Input 
-                        placeholder={`Image URL ${index + 1}`} 
-                        value={img} 
-                        onChange={(e) => {
-                          const newImages = [...bikeForm.images];
-                          newImages[index] = e.target.value;
-                          setBikeForm({ ...bikeForm, images: newImages });
-                        }} 
-                      />
-                      <div className="relative">
+              {bikeForm.images &&
+                bikeForm.images.map((img: string, index: number) => (
+                  <div key={index} className="space-y-3 p-3 border rounded-xl bg-muted/20 relative">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Image Slot {index + 1}</Label>
+                      {img && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            const newImages = [...bikeForm.images];
+                            newImages[index] = '';
+                            setBikeForm({ ...bikeForm, images: newImages });
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex gap-4 items-start">
+                      <BikeImagePreview url={img} label={`Additional preview ${index + 1}`} />
+                      <div className="flex-1 space-y-2">
                         <Input
-                          type="file"
-                          accept="image/*"
-                          className="cursor-pointer h-9 text-xs"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            try {
-                              const res = await documentsAPI.uploadFile(file, file.name, 'bike_image');
-                              if (res?.fileUrl) {
-                                const newImages = [...bikeForm.images];
-                                newImages[index] = res.fileUrl;
-                                setBikeForm({ ...bikeForm, images: newImages });
-                                toast({ title: 'Image uploaded', description: `Image ${index + 1} has been uploaded` });
-                              }
-                            } catch (err: any) {
-                              toast({ title: 'Upload error', description: err.message || 'Failed to upload image', variant: 'destructive' });
-                            }
+                          placeholder={`Image URL ${index + 1}`}
+                          value={img}
+                          onChange={(e) => {
+                            const newImages = [...bikeForm.images];
+                            newImages[index] = e.target.value;
+                            setBikeForm({ ...bikeForm, images: newImages });
                           }}
                         />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-                          <Download className="h-3.5 w-3.5" />
+                        <div className="relative">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            className="cursor-pointer h-9 text-xs"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              try {
+                                const res = await documentsAPI.uploadFile(
+                                  file,
+                                  file.name,
+                                  'bike_image'
+                                );
+                                if (res?.fileUrl) {
+                                  const newImages = [...bikeForm.images];
+                                  newImages[index] = res.fileUrl;
+                                  setBikeForm({ ...bikeForm, images: newImages });
+                                  toast({
+                                    title: 'Image uploaded',
+                                    description: `Image ${index + 1} has been uploaded`,
+                                  });
+                                }
+                              } catch (err: any) {
+                                toast({
+                                  title: 'Upload error',
+                                  description: err.message || 'Failed to upload image',
+                                  variant: 'destructive',
+                                });
+                              }
+                            }}
+                          />
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                            <Download className="h-3.5 w-3.5" />
+                          </div>
                         </div>
                       </div>
                     </div>
-                   </div>
-                </div>
-              ))}
+                  </div>
+                ))}
             </div>
             <div className="flex gap-2">
               <Button
@@ -2064,29 +2509,49 @@ export default function Admin() {
                       year: bikeForm.year ? parseInt(bikeForm.year) : null,
                       type: bikeForm.type,
                       kmLimit: bikeForm.kmLimit ? parseFloat(bikeForm.kmLimit) : null,
-                      locationId: currentUser?.role === 'superadmin' ? bikeForm.locationId : selectedLocationId,
+                      locationId:
+                        currentUser?.role === 'superadmin'
+                          ? bikeForm.locationId
+                          : selectedLocationId,
                       image: bikeForm.image,
                       images: bikeForm.images,
                     };
-                    
+
                     // Always include category if it exists in the form
                     if (bikeForm.category) {
                       payload.category = bikeForm.category;
                     } else {
                       payload.category = 'midrange'; // Default if not set
                     }
-                    
+
                     // Add pricing fields
-                    payload.price12Hours = bikeForm.price12Hours ? parseFloat(bikeForm.price12Hours) : null;
-                    payload.pricePerWeek = bikeForm.pricePerWeek ? parseFloat(bikeForm.pricePerWeek) : null;
+                    payload.price12Hours = bikeForm.price12Hours
+                      ? parseFloat(bikeForm.price12Hours)
+                      : null;
+                    payload.pricePerWeek = bikeForm.pricePerWeek
+                      ? parseFloat(bikeForm.pricePerWeek)
+                      : null;
 
                     // Add tariff fields
-                    payload.weekdayRate = bikeForm.weekdayRate ? parseFloat(bikeForm.weekdayRate) : null;
-                    payload.weekendRate = bikeForm.weekendRate ? parseFloat(bikeForm.weekendRate) : null;
-                    payload.excessKmCharge = bikeForm.excessKmCharge ? parseFloat(bikeForm.excessKmCharge) : null;
-                    payload.kmLimitPerHour = bikeForm.kmLimitPerHour ? parseFloat(bikeForm.kmLimitPerHour) : null;
-                    payload.minBookingHours = bikeForm.minBookingHours ? parseFloat(bikeForm.minBookingHours) : null;
-                    payload.gstPercentage = bikeForm.gstPercentage !== undefined && bikeForm.gstPercentage !== '' ? parseFloat(bikeForm.gstPercentage) : 18.0;
+                    payload.weekdayRate = bikeForm.weekdayRate
+                      ? parseFloat(bikeForm.weekdayRate)
+                      : null;
+                    payload.weekendRate = bikeForm.weekendRate
+                      ? parseFloat(bikeForm.weekendRate)
+                      : null;
+                    payload.excessKmCharge = bikeForm.excessKmCharge
+                      ? parseFloat(bikeForm.excessKmCharge)
+                      : null;
+                    payload.kmLimitPerHour = bikeForm.kmLimitPerHour
+                      ? parseFloat(bikeForm.kmLimitPerHour)
+                      : null;
+                    payload.minBookingHours = bikeForm.minBookingHours
+                      ? parseFloat(bikeForm.minBookingHours)
+                      : null;
+                    payload.gstPercentage =
+                      bikeForm.gstPercentage !== undefined && bikeForm.gstPercentage !== ''
+                        ? parseFloat(bikeForm.gstPercentage)
+                        : 18.0;
 
                     // Ensure legacy pricePerHour is set when only tariff pricing is configured
                     if (!bikeForm.pricePerHour && (bikeForm.weekdayRate || bikeForm.weekendRate)) {
@@ -2106,27 +2571,36 @@ export default function Admin() {
                     setEditingBike(null);
                     loadData();
                   } catch (e: any) {
-                    toast({ title: 'Error', description: e.message || 'Failed to save vehicle', variant: 'destructive' });
+                    toast({
+                      title: 'Error',
+                      description: e.message || 'Failed to save vehicle',
+                      variant: 'destructive',
+                    });
                   }
                 }}
               >
                 {editingBike ? 'Save' : 'Create'}
               </Button>
-              <Button variant="outline" onClick={() => setBikeDialogOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setBikeDialogOpen(false)}>
+                Cancel
+              </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* End Ride Dialog */}
-      <Dialog open={endRideDialogOpen} onOpenChange={(open) => {
-        setEndRideDialogOpen(open);
-        if (!open) {
-          // Reset date and time when dialog closes
-          setSelectedDate(undefined);
-          setSelectedTime('');
-        }
-      }}>
+      <Dialog
+        open={endRideDialogOpen}
+        onOpenChange={(open) => {
+          setEndRideDialogOpen(open);
+          if (!open) {
+            // Reset date and time when dialog closes
+            setSelectedDate(undefined);
+            setSelectedTime('');
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>End Ride</DialogTitle>
@@ -2138,11 +2612,15 @@ export default function Admin() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Start Time</Label>
-                <div className="text-sm font-medium p-2 bg-muted rounded-md">{endRideData.startTime}</div>
+                <div className="text-sm font-medium p-2 bg-muted rounded-md">
+                  {endRideData.startTime}
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label>End Time</Label>
-                <div className="text-sm font-medium p-2 bg-muted rounded-md">{endRideData.endTime}</div>
+                <div className="text-sm font-medium p-2 bg-muted rounded-md">
+                  {endRideData.endTime}
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -2175,38 +2653,47 @@ export default function Admin() {
                 />
               </div>
             </div>
-            {endRideData.startKm && endRideData.endKm && (() => {
-              const startKm = parseFloat(endRideData.startKm);
-              const endKm = parseFloat(endRideData.endKm);
-              const bike = bikesById[endRideData.bikeId];
-              if (!isNaN(startKm) && !isNaN(endKm) && bike && bike.excessKmCharge && bike.kmLimit) {
-                const totalKm = Math.max(0, endKm - startKm);
-                const kmLimit = bike.kmLimit;
-                const excessKm = Math.max(0, totalKm - kmLimit);
-                const calculatedPrice = excessKm * bike.excessKmCharge;
-                
-                if (excessKm > 0) {
-                  return (
-                    <div className="grid gap-2">
-                      <Label>Distance Price (calculated)</Label>
-                      <div className="text-sm font-medium p-2 bg-primary/10 text-primary rounded-md">
-                        {totalKm.toFixed(2)} km total - {kmLimit} km free = {excessKm.toFixed(2)} km excess × ₹{bike.excessKmCharge}/km = ₹{calculatedPrice.toFixed(2)}
+            {endRideData.startKm &&
+              endRideData.endKm &&
+              (() => {
+                const startKm = parseFloat(endRideData.startKm);
+                const endKm = parseFloat(endRideData.endKm);
+                const bike = bikesById[endRideData.bikeId];
+                if (
+                  !isNaN(startKm) &&
+                  !isNaN(endKm) &&
+                  bike &&
+                  bike.excessKmCharge &&
+                  bike.kmLimit
+                ) {
+                  const totalKm = Math.max(0, endKm - startKm);
+                  const kmLimit = bike.kmLimit;
+                  const excessKm = Math.max(0, totalKm - kmLimit);
+                  const calculatedPrice = excessKm * bike.excessKmCharge;
+
+                  if (excessKm > 0) {
+                    return (
+                      <div className="grid gap-2">
+                        <Label>Distance Price (calculated)</Label>
+                        <div className="text-sm font-medium p-2 bg-primary/10 text-primary rounded-md">
+                          {totalKm.toFixed(2)} km total - {kmLimit} km free = {excessKm.toFixed(2)}{' '}
+                          km excess × ₹{bike.excessKmCharge}/km = ₹{calculatedPrice.toFixed(2)}
+                        </div>
                       </div>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div className="grid gap-2">
-                      <Label>Distance Price (calculated)</Label>
-                      <div className="text-sm font-medium p-2 bg-muted rounded-md">
-                        {totalKm.toFixed(2)} km total - {kmLimit} km free = ₹0.00 (within limit)
+                    );
+                  } else {
+                    return (
+                      <div className="grid gap-2">
+                        <Label>Distance Price (calculated)</Label>
+                        <div className="text-sm font-medium p-2 bg-muted rounded-md">
+                          {totalKm.toFixed(2)} km total - {kmLimit} km free = ₹0.00 (within limit)
+                        </div>
                       </div>
-                    </div>
-                  );
+                    );
+                  }
                 }
-              }
-              return null;
-            })()}
+                return null;
+              })()}
             <div className="grid gap-2">
               <Label htmlFor="actualReturnTime">Actual Return Time</Label>
               <div className="flex gap-2">
@@ -2218,68 +2705,63 @@ export default function Admin() {
                       disabled={!endRideData.rawStartTime}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                      {selectedDate ? format(selectedDate, 'PPP') : 'Pick a date'}
                     </Button>
                   </PopoverTrigger>
                   {endRideData.rawStartTime && (
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      // Date is read-only (real-time) — keep handler no-op.
-                      onSelect={() => {}}
-                      disabled={(date) => {
-                        try {
-                          if (!date) return true;
-                          
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
-                          
-                          const dateOnly = new Date(date);
-                          dateOnly.setHours(0, 0, 0, 0);
-                          
-                          // Only allow today's date - disable all other dates
-                          return dateOnly.getTime() !== today.getTime();
-                        } catch {
-                          return true;
-                        }
-                      }}
-                      modifiers={{
-                        highlighted: (date) => {
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        // Date is read-only (real-time) — keep handler no-op.
+                        onSelect={() => {}}
+                        disabled={(date) => {
                           try {
-                            if (!date || !endRideData?.rawStartTime) return false;
-                            const bookingStart = new Date(endRideData.rawStartTime);
-                            bookingStart.setHours(0, 0, 0, 0);
+                            if (!date) return true;
 
                             const today = new Date();
                             today.setHours(0, 0, 0, 0);
 
                             const dateOnly = new Date(date);
                             dateOnly.setHours(0, 0, 0, 0);
-                            return dateOnly >= bookingStart && dateOnly <= today;
+
+                            // Only allow today's date - disable all other dates
+                            return dateOnly.getTime() !== today.getTime();
                           } catch {
-                            return false;
+                            return true;
                           }
-                        }
-                      }}
-                      modifiersStyles={{
-                        highlighted: {
-                          backgroundColor: 'hsl(var(--primary) / 0.2)',
-                          color: 'hsl(var(--primary))',
-                          fontWeight: '600'
-                        }
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
+                        }}
+                        modifiers={{
+                          highlighted: (date) => {
+                            try {
+                              if (!date || !endRideData?.rawStartTime) return false;
+                              const bookingStart = new Date(endRideData.rawStartTime);
+                              bookingStart.setHours(0, 0, 0, 0);
+
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+
+                              const dateOnly = new Date(date);
+                              dateOnly.setHours(0, 0, 0, 0);
+                              return dateOnly >= bookingStart && dateOnly <= today;
+                            } catch {
+                              return false;
+                            }
+                          },
+                        }}
+                        modifiersStyles={{
+                          highlighted: {
+                            backgroundColor: 'hsl(var(--primary) / 0.2)',
+                            color: 'hsl(var(--primary))',
+                            fontWeight: '600',
+                          },
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
                   )}
                 </Popover>
-                <Input
-                  type="text"
-                  value={selectedTime}
-                  readOnly
-                  className="w-32"
-                />
+                <Input type="text" value={selectedTime} readOnly className="w-32" />
               </div>
             </div>
             <div className="grid gap-2">
@@ -2293,60 +2775,61 @@ export default function Admin() {
                 placeholder="Auto-calculated"
               />
             </div>
-            {endRideData.delay && (() => {
-              const delayHours = parseFloat(endRideData.delay);
-              const bike = bikesById[endRideData.bikeId];
-              if (!isNaN(delayHours) && bike && delayHours > 0) {
-                const hourlyRate = bike.weekdayRate || bike.pricePerHour || 0;
-                const delayPrice = delayHours * hourlyRate;
-                return (
-                  <div className="grid gap-2">
-                    <Label>Delay Price (calculated)</Label>
-                    <div className="text-sm font-medium p-2 bg-primary/10 text-primary rounded-md">
-                      {delayHours.toFixed(2)} hrs × ₹{hourlyRate}/hr = ₹{delayPrice.toFixed(2)}
+            {endRideData.delay &&
+              (() => {
+                const delayHours = parseFloat(endRideData.delay);
+                const bike = bikesById[endRideData.bikeId];
+                if (!isNaN(delayHours) && bike && delayHours > 0) {
+                  const hourlyRate = bike.weekdayRate || bike.pricePerHour || 0;
+                  const delayPrice = delayHours * hourlyRate;
+                  return (
+                    <div className="grid gap-2">
+                      <Label>Delay Price (calculated)</Label>
+                      <div className="text-sm font-medium p-2 bg-primary/10 text-primary rounded-md">
+                        {delayHours.toFixed(2)} hrs × ₹{hourlyRate}/hr = ₹{delayPrice.toFixed(2)}
+                      </div>
                     </div>
-                  </div>
-                );
-              }
-              return null;
-            })()}
+                  );
+                }
+                return null;
+              })()}
             {(() => {
               const startKm = parseFloat(endRideData.startKm);
               const endKm = parseFloat(endRideData.endKm);
               const delayHours = parseFloat(endRideData.delay);
               const bike = bikesById[endRideData.bikeId];
-              
+
               let distancePrice = 0;
               let delayPrice = 0;
               let totalPrice = 0;
-              
+
               if (!isNaN(startKm) && !isNaN(endKm) && bike && bike.excessKmCharge && bike.kmLimit) {
                 const totalKm = Math.max(0, endKm - startKm);
                 const kmLimit = bike.kmLimit;
                 const excessKm = Math.max(0, totalKm - kmLimit);
                 distancePrice = excessKm * bike.excessKmCharge;
               }
-              
+
               if (!isNaN(delayHours) && bike && delayHours > 0) {
                 const hourlyRate = bike.weekdayRate || bike.pricePerHour || 0;
                 delayPrice = delayHours * hourlyRate;
               }
-              
+
               totalPrice = distancePrice + delayPrice;
-              
+
               // Show bill if we have meter readings or delay, even if charges are 0
               if ((!isNaN(startKm) && !isNaN(endKm)) || (!isNaN(delayHours) && delayHours > 0)) {
                 return (
                   <div className="grid gap-2 border-t pt-4 mt-2">
                     <Label className="text-base font-semibold">Total Price</Label>
                     <div className="bg-card border rounded-lg p-4 space-y-2">
-                      {(!isNaN(startKm) && !isNaN(endKm)) && (
+                      {!isNaN(startKm) && !isNaN(endKm) && (
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-muted-foreground">Distance Charge</span>
                           <span className="text-sm font-medium">₹{distancePrice.toFixed(2)}</span>
                         </div>
                       )}
-                      {(!isNaN(delayHours) && delayHours > 0) && (
+                      {!isNaN(delayHours) && delayHours > 0 && (
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-muted-foreground">Delay Charge</span>
                           <span className="text-sm font-medium">₹{delayPrice.toFixed(2)}</span>
@@ -2354,7 +2837,9 @@ export default function Admin() {
                       )}
                       <div className="flex justify-between items-center pt-2 border-t">
                         <span className="text-base font-semibold">Total</span>
-                        <span className="text-base font-bold text-primary">₹{totalPrice.toFixed(2)}</span>
+                        <span className="text-base font-bold text-primary">
+                          ₹{totalPrice.toFixed(2)}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -2365,35 +2850,37 @@ export default function Admin() {
           </div>
           <div className="mt-4">
             <div className="relative h-12 bg-muted rounded-full overflow-hidden select-none">
-              <div 
+              <div
                 className="absolute left-0 top-0 bottom-0 bg-primary transition-all duration-75 ease-linear"
                 style={{ width: `${slideValue}%` }}
               />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className={`font-medium text-sm transition-colors duration-200 ${slideValue > 50 ? 'text-primary-foreground' : 'text-foreground'}`}>
+                <span
+                  className={`font-medium text-sm transition-colors duration-200 ${slideValue > 50 ? 'text-primary-foreground' : 'text-foreground'}`}
+                >
                   {isEnding ? 'Ending...' : 'Slide to End Ride'}
                 </span>
               </div>
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                value={slideValue} 
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={slideValue}
                 onChange={(e) => {
-                   const val = parseInt(e.target.value);
-                   setSlideValue(val);
-                   if (val === 100) handleEndRideSubmit();
+                  const val = parseInt(e.target.value);
+                  setSlideValue(val);
+                  if (val === 100) handleEndRideSubmit();
                 }}
                 onMouseUp={() => slideValue < 100 && setSlideValue(0)}
                 onTouchEnd={() => slideValue < 100 && setSlideValue(0)}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 disabled={isEnding}
               />
-              <div 
+              <div
                 className="absolute top-1 bottom-1 aspect-square bg-background rounded-full shadow-md flex items-center justify-center pointer-events-none transition-all duration-75 ease-linear"
-                style={{ left: `calc(${slideValue}% - ${slideValue * 0.4}px)` }} 
+                style={{ left: `calc(${slideValue}% - ${slideValue * 0.4}px)` }}
               >
-                 <ChevronRight className="h-5 w-5 text-primary" />
+                <ChevronRight className="h-5 w-5 text-primary" />
               </div>
             </div>
           </div>
@@ -2405,11 +2892,9 @@ export default function Admin() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>User Details</DialogTitle>
-            <DialogDescription>
-              View and verify user information and documents
-            </DialogDescription>
+            <DialogDescription>View and verify user information and documents</DialogDescription>
           </DialogHeader>
-          
+
           {selectedUser && (
             <div className="space-y-6">
               {/* User Information */}
@@ -2433,8 +2918,12 @@ export default function Admin() {
                   </Badge>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Wallet Balance</label>
-                  <p className="text-sm font-medium">₹{selectedUser.walletBalance?.toFixed(2) || '0.00'}</p>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Wallet Balance
+                  </label>
+                  <p className="text-sm font-medium">
+                    ₹{selectedUser.walletBalance?.toFixed(2) || '0.00'}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-muted-foreground">Status</label>
@@ -2466,26 +2955,35 @@ export default function Admin() {
                     {selectedUser.documents.map((doc: any) => {
                       const StatusIcon = statusStyles[doc.status as keyof typeof statusStyles].icon;
                       return (
-                        <div key={doc.id || doc._id} className="border rounded-lg p-3 sm:p-4 bg-card">
+                        <div
+                          key={doc.id || doc._id}
+                          className="border rounded-lg p-3 sm:p-4 bg-card"
+                        >
                           <div className="flex items-center justify-between mb-2 sm:mb-3">
                             <div className="min-w-0 flex-1 mr-2">
-                              <p className="font-semibold text-sm truncate">{doc.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                              <p className="font-semibold text-sm truncate">
+                                {doc.type
+                                  .replace('_', ' ')
+                                  .replace(/\b\w/g, (l) => l.toUpperCase())}
+                              </p>
                               <p className="text-xs text-muted-foreground truncate">{doc.name}</p>
                             </div>
-                            <Badge className={`${statusStyles[doc.status as keyof typeof statusStyles].color} shrink-0`}>
+                            <Badge
+                              className={`${statusStyles[doc.status as keyof typeof statusStyles].color} shrink-0`}
+                            >
                               <StatusIcon className="h-3 w-3 mr-1" />
                               <span className="hidden sm:inline">{doc.status}</span>
                             </Badge>
                           </div>
-                          
+
                           {doc.status === 'rejected' && doc.rejectionReason && (
                             <div className="mb-2 px-2 py-1 bg-destructive/5 border border-destructive/10 rounded text-[10px] text-destructive">
                               <span className="font-semibold">Reason:</span> {doc.rejectionReason}
                             </div>
                           )}
-                          
+
                           {/* Document Preview */}
-                          <div 
+                          <div
                             className="mb-2 sm:mb-3 border rounded-lg overflow-hidden bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
                             onClick={() => {
                               if (doc.url) {
@@ -2495,8 +2993,8 @@ export default function Admin() {
                             }}
                           >
                             {doc.url && (
-                              <img 
-                                src={doc.url} 
+                              <img
+                                src={doc.url}
                                 alt={doc.name}
                                 className="w-full h-24 sm:h-32 object-contain"
                                 onError={(e) => {
@@ -2510,11 +3008,11 @@ export default function Admin() {
                             <p className="text-[10px] sm:text-xs text-muted-foreground">
                               {new Date(doc.uploadedAt).toLocaleDateString()}
                             </p>
-                            
+
                             <div className="flex gap-2 justify-end mt-2">
                               {doc.status !== 'rejected' && (
-                                <Button 
-                                  size="sm" 
+                                <Button
+                                  size="sm"
                                   variant="outline"
                                   className="h-7 px-2 text-xs text-destructive hover:text-destructive"
                                   onClick={() => handleDocumentAction(doc.id || doc._id, 'reject')}
@@ -2524,7 +3022,7 @@ export default function Admin() {
                                 </Button>
                               )}
                               {doc.status !== 'approved' && (
-                                <Button 
+                                <Button
                                   size="sm"
                                   className="h-7 px-2 text-xs bg-accent hover:bg-accent/90"
                                   onClick={() => handleDocumentAction(doc.id || doc._id, 'approve')}
@@ -2559,30 +3057,45 @@ export default function Admin() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {rentalsForLocation.filter(r => r.userId === selectedUser.id).length > 0 ? (
+                      {rentalsForLocation.filter((r) => r.userId === selectedUser.id).length > 0 ? (
                         rentalsForLocation
-                          .filter(r => r.userId === selectedUser.id)
+                          .filter((r) => r.userId === selectedUser.id)
                           .map((rental) => {
-                            const bike = bikes.find(b => b.id === rental.bikeId);
+                            const bike = bikes.find((b) => b.id === rental.bikeId);
                             return (
                               <tr key={rental.id}>
                                 <td className="px-4 py-3 text-sm">{bike?.name || rental.bikeId}</td>
-                                <td className="px-4 py-3 text-sm">{new Date(rental.startTime).toLocaleString()}</td>
-                                <td className="px-4 py-3 text-sm">{rental.endTime ? new Date(rental.endTime).toLocaleString() : '-'}</td>
                                 <td className="px-4 py-3 text-sm">
-                                  <Badge variant="outline" className={statusStyles[rental.status as keyof typeof statusStyles]?.color || 'bg-muted'}>
+                                  {new Date(rental.startTime).toLocaleString()}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {rental.endTime ? new Date(rental.endTime).toLocaleString() : '-'}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      statusStyles[rental.status as keyof typeof statusStyles]
+                                        ?.color || 'bg-muted'
+                                    }
+                                  >
                                     {rental.status}
                                   </Badge>
                                 </td>
                                 <td className="px-4 py-3 text-sm text-right">
-                                  {rental.totalCost || rental.totalAmount ? `₹${rental.totalCost || rental.totalAmount}` : '-'}
+                                  {rental.totalCost || rental.totalAmount
+                                    ? `₹${rental.totalCost || rental.totalAmount}`
+                                    : '-'}
                                 </td>
                               </tr>
                             );
                           })
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">
+                          <td
+                            colSpan={5}
+                            className="px-4 py-8 text-center text-muted-foreground text-sm"
+                          >
                             No ride history found
                           </td>
                         </tr>
@@ -2603,7 +3116,10 @@ export default function Admin() {
                     Verify User
                   </Button>
                 ) : (
-                  <Button variant="destructive" onClick={() => handleVerifyUser(selectedUser.id, false)}>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleVerifyUser(selectedUser.id, false)}
+                  >
                     <Shield className="h-4 w-4 mr-2" />
                     Unverify User
                   </Button>
@@ -2618,7 +3134,12 @@ export default function Admin() {
       <Dialog open={isDocumentDialogOpen} onOpenChange={setIsDocumentDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <div className="flex items-center gap-2 mb-2">
-            <Button variant="ghost" size="sm" className="gap-1 pl-0 text-muted-foreground hover:text-foreground" onClick={() => setIsDocumentDialogOpen(false)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 pl-0 text-muted-foreground hover:text-foreground"
+              onClick={() => setIsDocumentDialogOpen(false)}
+            >
               <ChevronLeft className="h-4 w-4" />
               Go Back
             </Button>
@@ -2629,7 +3150,7 @@ export default function Admin() {
               Review and verify documents for {selectedDocumentUser?.name}
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedDocumentUser && (
             <div className="space-y-6">
               {/* User Info */}
@@ -2690,26 +3211,33 @@ export default function Admin() {
                   selectedDocumentUser.documents.map((doc: any) => {
                     const StatusIcon = statusStyles[doc.status as keyof typeof statusStyles].icon;
                     return (
-                      <div key={doc.id || doc._id} className="border rounded-lg p-3 sm:p-4 bg-card flex flex-col h-full">
+                      <div
+                        key={doc.id || doc._id}
+                        className="border rounded-lg p-3 sm:p-4 bg-card flex flex-col h-full"
+                      >
                         <div className="flex items-center justify-between mb-2 sm:mb-3">
                           <div className="min-w-0 flex-1 mr-2">
-                            <p className="font-semibold text-sm truncate">{doc.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                            <p className="font-semibold text-sm truncate">
+                              {doc.type.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                            </p>
                             <p className="text-xs text-muted-foreground truncate">{doc.name}</p>
                           </div>
-                          <Badge className={`${statusStyles[doc.status as keyof typeof statusStyles].color} shrink-0`}>
+                          <Badge
+                            className={`${statusStyles[doc.status as keyof typeof statusStyles].color} shrink-0`}
+                          >
                             <StatusIcon className="h-3 w-3 mr-1" />
                             <span className="hidden sm:inline">{doc.status}</span>
                           </Badge>
                         </div>
-                        
+
                         {doc.status === 'rejected' && doc.rejectionReason && (
                           <div className="mb-2 px-2 py-1 bg-destructive/5 border border-destructive/10 rounded text-[10px] text-destructive">
                             <span className="font-semibold">Reason:</span> {doc.rejectionReason}
                           </div>
                         )}
-                        
+
                         {/* Document Preview */}
-                        <div 
+                        <div
                           className="mb-2 sm:mb-3 border rounded-lg overflow-hidden bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
                           onClick={() => {
                             if (doc.url) {
@@ -2719,8 +3247,8 @@ export default function Admin() {
                           }}
                         >
                           {doc.url && (
-                            <img 
-                              src={doc.url} 
+                            <img
+                              src={doc.url}
                               alt={doc.name}
                               className="w-full h-24 sm:h-32 object-contain"
                               onError={(e) => {
@@ -2738,8 +3266,8 @@ export default function Admin() {
                           </div>
                           <div className="flex flex-col gap-2">
                             {doc.status !== 'rejected' && (
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 className="w-full h-7 text-xs px-2 text-destructive hover:text-destructive"
                                 onClick={() => handleDocumentAction(doc.id || doc._id, 'reject')}
@@ -2749,7 +3277,7 @@ export default function Admin() {
                               </Button>
                             )}
                             {doc.status !== 'approved' && (
-                              <Button 
+                              <Button
                                 size="sm"
                                 className="w-full h-7 text-xs px-2 bg-accent hover:bg-accent/90"
                                 onClick={() => handleDocumentAction(doc.id || doc._id, 'approve')}
@@ -2764,7 +3292,9 @@ export default function Admin() {
                     );
                   })
                 ) : (
-                  <p className="text-muted-foreground text-center py-8 col-span-2">No documents uploaded</p>
+                  <p className="text-muted-foreground text-center py-8 col-span-2">
+                    No documents uploaded
+                  </p>
                 )}
               </div>
 
@@ -2783,30 +3313,46 @@ export default function Admin() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {rentalsForLocation.filter(r => r.userId === selectedDocumentUser.id).length > 0 ? (
+                      {rentalsForLocation.filter((r) => r.userId === selectedDocumentUser.id)
+                        .length > 0 ? (
                         rentalsForLocation
-                          .filter(r => r.userId === selectedDocumentUser.id)
+                          .filter((r) => r.userId === selectedDocumentUser.id)
                           .map((rental) => {
-                            const bike = bikes.find(b => b.id === rental.bikeId);
+                            const bike = bikes.find((b) => b.id === rental.bikeId);
                             return (
                               <tr key={rental.id}>
                                 <td className="px-4 py-3 text-sm">{bike?.name || rental.bikeId}</td>
-                                <td className="px-4 py-3 text-sm">{new Date(rental.startTime).toLocaleString()}</td>
-                                <td className="px-4 py-3 text-sm">{rental.endTime ? new Date(rental.endTime).toLocaleString() : '-'}</td>
                                 <td className="px-4 py-3 text-sm">
-                                  <Badge variant="outline" className={statusStyles[rental.status as keyof typeof statusStyles]?.color || 'bg-muted'}>
+                                  {new Date(rental.startTime).toLocaleString()}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {rental.endTime ? new Date(rental.endTime).toLocaleString() : '-'}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      statusStyles[rental.status as keyof typeof statusStyles]
+                                        ?.color || 'bg-muted'
+                                    }
+                                  >
                                     {rental.status}
                                   </Badge>
                                 </td>
                                 <td className="px-4 py-3 text-sm text-right">
-                                  {rental.totalCost || rental.totalAmount ? `₹${rental.totalCost || rental.totalAmount}` : '-'}
+                                  {rental.totalCost || rental.totalAmount
+                                    ? `₹${rental.totalCost || rental.totalAmount}`
+                                    : '-'}
                                 </td>
                               </tr>
                             );
                           })
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">
+                          <td
+                            colSpan={5}
+                            className="px-4 py-8 text-center text-muted-foreground text-sm"
+                          >
                             No ride history found
                           </td>
                         </tr>
@@ -2823,7 +3369,7 @@ export default function Admin() {
                   Close
                 </Button>
                 {!selectedDocumentUser.isVerified ? (
-                  <Button 
+                  <Button
                     className="bg-accent hover:bg-accent/90"
                     onClick={() => {
                       handleVerifyUser(selectedDocumentUser.id, true);
@@ -2834,7 +3380,7 @@ export default function Admin() {
                     Verify User
                   </Button>
                 ) : (
-                  <Button 
+                  <Button
                     variant="destructive"
                     onClick={() => {
                       handleVerifyUser(selectedDocumentUser.id, false);
@@ -2857,13 +3403,14 @@ export default function Admin() {
           <DialogHeader>
             <DialogTitle>Rejection Reason</DialogTitle>
             <DialogDescription>
-              Please provide a reason why this document is being rejected. This will be visible to the user.
+              Please provide a reason why this document is being rejected. This will be visible to
+              the user.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="reason">Reason</Label>
-              <Textarea 
+              <Textarea
                 id="reason"
                 placeholder="e.g. Image is blurry, Document is expired, etc."
                 value={rejectionReason}
@@ -2891,10 +3438,13 @@ export default function Admin() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4 max-h-[70vh] overflow-y-auto">
             {selectedRentalImages && selectedRentalImages.length > 0 ? (
               selectedRentalImages.map((img, idx) => (
-                <div key={idx} className="relative aspect-video bg-muted rounded-lg overflow-hidden border group">
-                  <img 
-                    src={img} 
-                    alt={`Rental image ${idx + 1}`} 
+                <div
+                  key={idx}
+                  className="relative aspect-video bg-muted rounded-lg overflow-hidden border group"
+                >
+                  <img
+                    src={img}
+                    alt={`Rental image ${idx + 1}`}
                     className="object-cover w-full h-full cursor-pointer"
                     onClick={() => setFullScreenImageIndex(idx)}
                   />
@@ -2923,7 +3473,10 @@ export default function Admin() {
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
-                        toast({ title: 'Download started', description: 'Image download initiated' });
+                        toast({
+                          title: 'Download started',
+                          description: 'Image download initiated',
+                        });
                       }}
                       className="bg-white hover:bg-gray-100 text-black font-semibold border border-gray-300 shadow-lg"
                     >
@@ -2942,57 +3495,63 @@ export default function Admin() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isPreviewModalOpen} onOpenChange={(open) => {
-        setIsPreviewModalOpen(open);
-        if (!open) setZoomScale(1);
-      }}>
+      <Dialog
+        open={isPreviewModalOpen}
+        onOpenChange={(open) => {
+          setIsPreviewModalOpen(open);
+          if (!open) setZoomScale(1);
+        }}
+      >
         <DialogContent className="max-w-5xl w-[95vw] h-[85vh] p-0 overflow-hidden bg-black/95 border-none shadow-2xl flex flex-col">
           <div className="relative flex-1 w-full h-full overflow-auto custom-scrollbar flex items-center justify-center p-4 sm:p-8">
             {previewImageUrl && (
-              <div 
+              <div
                 className="relative transition-all duration-300 ease-in-out flex items-center justify-center min-w-full min-h-full"
-                style={{ 
+                style={{
                   transform: `scale(${zoomScale})`,
-                  transformOrigin: 'center center'
+                  transformOrigin: 'center center',
                 }}
               >
-                <img 
-                  src={previewImageUrl} 
-                  alt="Large Preview" 
+                <img
+                  src={previewImageUrl}
+                  alt="Large Preview"
                   className="max-w-full max-h-full object-contain shadow-2xl animate-in fade-in zoom-in duration-300"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Image+Load+Error';
+                    (e.target as HTMLImageElement).src =
+                      'https://placehold.co/600x400?text=Image+Load+Error';
                   }}
                 />
               </div>
             )}
-            
+
             {/* Floating Zoom Controls - Bottom Center */}
             <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1.5 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="h-9 w-9 text-white hover:bg-white/20 rounded-xl"
-                onClick={() => setZoomScale(prev => Math.max(prev - 0.25, 0.5))}
+                onClick={() => setZoomScale((prev) => Math.max(prev - 0.25, 0.5))}
                 title="Zoom Out"
               >
                 <ZoomOut className="h-5 w-5" />
               </Button>
               <div className="px-3 min-w-[60px] text-center border-x border-white/10">
-                <span className="text-xs font-bold text-white tracking-tight">{Math.round(zoomScale * 100)}%</span>
+                <span className="text-xs font-bold text-white tracking-tight">
+                  {Math.round(zoomScale * 100)}%
+                </span>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="h-9 w-9 text-white hover:bg-white/20 rounded-xl"
-                onClick={() => setZoomScale(prev => Math.min(prev + 0.25, 4))}
+                onClick={() => setZoomScale((prev) => Math.min(prev + 0.25, 4))}
                 title="Zoom In"
               >
                 <ZoomIn className="h-5 w-5" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="ml-1 h-9 w-9 text-white/60 hover:text-white hover:bg-white/20 rounded-xl"
                 onClick={() => setZoomScale(1)}
                 title="Reset Zoom"
@@ -3001,26 +3560,28 @@ export default function Admin() {
               </Button>
             </div>
 
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md z-50 h-10 w-10 border border-white/10"
               onClick={() => setIsPreviewModalOpen(false)}
             >
               <X className="h-6 w-6" />
             </Button>
           </div>
-          
+
           {previewImageUrl && (
             <div className="p-4 bg-black/40 backdrop-blur-md border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 z-50">
               <div className="flex flex-col max-w-full sm:max-w-[70%]">
-                <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-1">Image Source</p>
+                <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-1">
+                  Image Source
+                </p>
                 <p className="text-xs font-medium truncate text-white/70">{previewImageUrl}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="bg-white/5 text-white border-white/10 hover:bg-white/10 h-9 px-4 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95"
                   onClick={() => window.open(previewImageUrl, '_blank')}
                 >
@@ -3033,7 +3594,7 @@ export default function Admin() {
         </DialogContent>
       </Dialog>
 
-        {/* Full Screen Image Viewer */}
+      {/* Full Screen Image Viewer */}
       {fullScreenImageIndex !== null && selectedRentalImages[fullScreenImageIndex] && (
         <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
           <div className="relative w-full h-full flex items-center justify-center p-4">
