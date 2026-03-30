@@ -26,3 +26,24 @@
 {"level":"info","message":"🚀 Server running on port 3015 in development mode","timestamp":"2026-03-30T09:55:56.895Z"}
 {"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T09:56:25.276Z"}
 {"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T09:56:33.720Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:02:32.082Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:03:32.988Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:04:08.640Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:08:49.495Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:09:07.151Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:09:45.949Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:10:13.758Z"}
+{"level":"error","message":"TypeError: Cannot read properties of undefined (reading 'userId')","method":"GET","path":"/api/rentals","stack":"TypeError: Cannot read properties of undefined (reading 'userId')\n    at file:///C:/Users/Dell/Desktop/Bikerentaldeploy/backend/routes/rentals.js:14:45\n    at file:///C:/Users/Dell/Desktop/Bikerentaldeploy/backend/utils/catchAsync.js:8:5\n    at Layer.handle [as handle_request] (C:\\Users\\Dell\\Desktop\\Bikerentaldeploy\\backend\\node_modules\\express\\lib\\router\\layer.js:95:5)\n    at next (C:\\Users\\Dell\\Desktop\\Bikerentaldeploy\\backend\\node_modules\\express\\lib\\router\\route.js:149:13)\n    at Route.dispatch (C:\\Users\\Dell\\Desktop\\Bikerentaldeploy\\backend\\node_modules\\express\\lib\\router\\route.js:119:3)\n    at Layer.handle [as handle_request] (C:\\Users\\Dell\\Desktop\\Bikerentaldeploy\\backend\\node_modules\\express\\lib\\router\\layer.js:95:5)\n    at C:\\Users\\Dell\\Desktop\\Bikerentaldeploy\\backend\\node_modules\\express\\lib\\router\\index.js:284:15\n    at Function.process_params (C:\\Users\\Dell\\Desktop\\Bikerentaldeploy\\backend\\node_modules\\express\\lib\\router\\index.js:346:12)\n    at next (C:\\Users\\Dell\\Desktop\\Bikerentaldeploy\\backend\\node_modules\\express\\lib\\router\\index.js:280:10)\n    at Function.handle (C:\\Users\\Dell\\Desktop\\Bikerentaldeploy\\backend\\node_modules\\express\\lib\\router\\index.js:175:3)","timestamp":"2026-03-30T10:10:34.596Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:11:35.900Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:11:44.633Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:12:55.057Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:15:50.228Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:22:36.093Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:22:44.981Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:23:12.888Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:23:51.455Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:33:26.480Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:34:45.451Z"}
+{"level":"info","message":"🚀 Server running on port 3000 in development mode","timestamp":"2026-03-30T10:34:47.589Z"}
+{"level":"info","message":"🚀 Server running on port 5000 in development mode","timestamp":"2026-03-30T10:38:21.073Z"}
+{"level":"info","message":"🚀 Server running on port 7000 in development mode","timestamp":"2026-03-30T10:40:32.475Z"}

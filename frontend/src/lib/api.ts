@@ -46,42 +46,56 @@ function handleAuthError() {
 
 async function apiRequest<T>(path: string, init: RequestInit = {}, isPublic = false): Promise<T> {
   const token = localStorage.getItem('authToken');
+  console.log(`[API] ${init.method || 'GET'} ${path} - Token present: ${!!token}`);
+  
   const headers = {
     'Content-Type': 'application/json',
     ...init.headers,
   } as Record<string, string>;
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers['Authorization'] = `Bearer ${token.trim()}`;
   }
 
   const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
-  const response = await fetch(url, {
-    ...init,
-    headers,
-  });
+  
+  try {
+    const response = await fetch(url, {
+      ...init,
+      headers,
+    });
 
-  if (!response.ok) {
-    if (response.status === 401 && !isPublic) {
-      // Don't clear token for guest failures, only for authenticated user failures
-      if (token) {
-        setAuthToken(null);
-        localStorage.removeItem('currentUser');
-        // window.location.href = '/login'; // Original code avoids automatic redirect
+    if (!response.ok) {
+      console.error(`[API ERROR] ${response.status} ${response.statusText} for ${url}`);
+      
+      if (response.status === 401 && !isPublic) {
+        if (token) {
+          console.warn('[API Auth] 401 Unauthorized - Clearing token');
+          setAuthToken(null);
+          localStorage.removeItem('currentUser');
+        }
+        const error = new Error(`Authentication failed: ${response.status}`);
+        (error as any).status = response.status;
+        throw error;
       }
-      const error = new Error(`Authentication failed: ${response.status}`);
-      (error as any).status = response.status;
-      throw error;
+      
+      if (response.status === 403) {
+        console.error('[API Auth] 403 Forbidden - Possible role issue or invalid token');
+      }
+
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(errorData.message || `Request failed with status ${response.status}`);
     }
-    const errorData = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(errorData.message || `Request failed with status ${response.status}`);
-  }
 
-  if (response.headers.get('Content-Length') === '0' || response.status === 204) {
-    return null as T;
-  }
+    if (response.headers.get('Content-Length') === '0' || response.status === 204) {
+      return null as T;
+    }
 
-  return response.json();
+    return response.json();
+  } catch (error) {
+    console.error(`[API FETCH ERROR] ${url}:`, error);
+    throw error;
+  }
 }
 
 export const authAPI = {
