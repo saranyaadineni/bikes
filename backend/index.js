@@ -59,16 +59,6 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev')); // 
 const PORT = process.env.PORT || 7000;
 
 // =====================================
-// ✅ CONNECT DATABASE
-// =====================================
-connectDB();
-
-// =====================================
-// ✅ INIT CRON JOBS
-// =====================================
-initCronJobs();
-
-// =====================================
 // ✅ SECURITY MIDDLEWARE
 // =====================================
 app.use(helmet({
@@ -167,10 +157,23 @@ app.use((err, req, res, next) => {
       : err.message
   });
 });
+// =====================================
+// ✅ START SERVER (FIXED)
+// =====================================
+const startServer = async () => {
+  try {
+    await connectDB(); // ✅ ONLY here
 
-// =====================================
-// ✅ START SERVER
-// =====================================
-app.listen(PORT, () => {
-  logger.info(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-});
+    initCronJobs(); // ✅ after DB
+
+    app.listen(PORT, () => {
+      logger.info(`🚀 Server running on port ${PORT}`);
+    });
+
+  } catch (error) {
+    logger.error("❌ Failed to start server:", error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
