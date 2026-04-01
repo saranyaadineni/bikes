@@ -56,7 +56,7 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev')); // 
 // =====================================
 // ✅ IMPORTANT FOR RENDER / DEPLOYMENT
 // =====================================
-const PORT = process.env.PORT || 7000;
+const PORT = process.env.PORT || 9000;
 
 // =====================================
 // ✅ SECURITY MIDDLEWARE
@@ -167,8 +167,9 @@ const startServer = async () => {
     initCronJobs(); // ✅ after DB
 
     app.listen(PORT, () => {
-      logger.info(`🚀 Server running on port ${PORT}`);
-    });
+  console.log(`🚀 Server running on port ${PORT}`);
+  logger.info(`🚀 Server running on port ${PORT}`);
+});
 
   } catch (error) {
     logger.error("❌ Failed to start server:", error.message);
