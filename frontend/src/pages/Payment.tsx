@@ -184,11 +184,17 @@ export default function Payment() {
             
             if (result.success) {
               navigate('/payment-success', { state: { rental: result.rental, bike } });
+            } else {
+              toast({
+                title: 'Payment Verification Failed',
+                description: result.message || 'Please contact support if money was deducted.',
+                variant: 'destructive',
+              });
             }
-          } catch (error) {
+          } catch (error: any) {
             toast({
               title: 'Payment Verification Failed',
-              description: 'Please contact support if money was deducted.',
+              description: error.message || 'Please contact support if money was deducted.',
               variant: 'destructive',
             });
           }

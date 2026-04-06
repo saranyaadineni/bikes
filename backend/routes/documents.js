@@ -218,12 +218,24 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
     }
 
     // Find user with this document
-    const user = await User.findOne({ 'documents._id': req.params.id });
+    let user = await User.findOne({ 'documents._id': req.params.id });
+    
     if (!user) {
+      // Try finding by the document id directly if it's a valid ObjectId
+      if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+        user = await User.findOne({ 'documents._id': new mongoose.Types.ObjectId(req.params.id) });
+      }
+    }
+
+    if (!user) {
+      console.log(`Document ${req.params.id} not found in any user profile`);
       return res.status(404).json({ message: 'Document not found' });
     }
 
     const doc = user.documents.id(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ message: 'Document content not found' });
+    }
     doc.status = status;
     
     // Add rejection reason if status is rejected
@@ -233,12 +245,14 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
       doc.rejectionReason = null; // Clear reason if approved later
     }
 
+    // Explicitly mark documents as modified for subdocument updates
+    user.markModified('documents');
     await user.save();
 
     res.json(doc);
   } catch (error) {
     console.error('Update document status error:', error);
-    res.status(500).json({ message: 'Error updating document status' });
+    res.status(500).json({ message: error.message || 'Error updating document status' });
   }
 });
 

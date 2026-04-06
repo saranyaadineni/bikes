@@ -3,6 +3,7 @@ import { authenticateToken, authorize } from '../middleware/auth.js';
 import Rental from '../models/Rental.js';
 import Bike from '../models/Bike.js';
 import User from '../models/User.js';
+import Review from '../models/Review.js';
 import { transformRental } from '../utils/transform.js';
 import { catchAsync } from '../utils/catchAsync.js';
 import AppError from '../utils/appError.js';
@@ -64,11 +65,116 @@ router.post('/', catchAsync(async (req, res) => {
 
 // Update rental status (TEMP: DISABLED AUTH)
 router.patch('/:id/status', catchAsync(async (req, res) => {
-  const { status } = req.body;
+  const { status, startKm, endKm, delay, totalCost } = req.body;
+  const updates = { status };
+  if (startKm !== undefined) updates.startKm = startKm;
+  if (endKm !== undefined) updates.endKm = endKm;
+  if (delay !== undefined) updates.delay = delay;
+  if (totalCost !== undefined) updates.totalCost = totalCost;
+
   const rental = await Rental.findByIdAndUpdate(
     req.params.id,
-    { status },
+    updates,
     { new: true, runValidators: true }
+  );
+
+  if (!rental) throw new AppError('Rental not found', 404);
+  
+  // If completed or cancelled, make bike available again
+  if (status === 'completed' || status === 'cancelled') {
+    await Bike.findByIdAndUpdate(rental.bikeId, { available: true });
+  }
+  
+  res.json(transformRental(rental));
+}));
+
+// Cancel rental
+router.post('/:id/cancel', catchAsync(async (req, res) => {
+  const rental = await Rental.findById(req.params.id);
+  if (!rental) throw new AppError('Rental not found', 404);
+
+  if (['ongoing', 'completed', 'cancelled'].includes(rental.status)) {
+    throw new AppError(`Cannot cancel a ride that is already ${rental.status}`, 400);
+  }
+
+  rental.status = 'cancelled';
+  await rental.save();
+
+  // Make bike available again
+  await Bike.findByIdAndUpdate(rental.bikeId, { available: true });
+
+  res.json(transformRental(rental));
+}));
+
+// Start ride
+router.post('/:id/start', catchAsync(async (req, res) => {
+  const rental = await Rental.findById(req.params.id);
+  if (!rental) throw new AppError('Rental not found', 404);
+
+  if (rental.status !== 'confirmed') {
+    throw new AppError('Ride must be confirmed before starting', 400);
+  }
+
+  rental.status = 'ongoing';
+  rental.pickupTime = new Date();
+  await rental.save();
+
+  res.json(transformRental(rental));
+}));
+
+// Complete ride (Alternative endpoint used by frontend)
+router.post('/:id/complete', catchAsync(async (req, res) => {
+  const { endKm, delay, totalCost } = req.body;
+  const rental = await Rental.findById(req.params.id);
+  if (!rental) throw new AppError('Rental not found', 404);
+
+  if (rental.status !== 'ongoing') {
+    throw new AppError('Ride must be ongoing before completing', 400);
+  }
+
+  rental.status = 'completed';
+  rental.dropoffTime = new Date();
+  if (endKm) rental.endKm = endKm;
+  if (delay) rental.delay = delay;
+  if (totalCost) rental.totalCost = totalCost;
+  
+  await rental.save();
+
+  // Make bike available again
+  await Bike.findByIdAndUpdate(rental.bikeId, { available: true });
+
+  res.json(transformRental(rental));
+}));
+
+// Submit review
+router.post('/:id/review', catchAsync(async (req, res) => {
+  const { rating, comment } = req.body;
+  const rental = await Rental.findById(req.params.id);
+  if (!rental) throw new AppError('Rental not found', 404);
+
+  if (rental.status !== 'completed') {
+    throw new AppError('Can only review completed rides', 400);
+  }
+
+  const review = new Review({
+    rentalId: rental._id,
+    userId: rental.userId,
+    bikeId: rental.bikeId,
+    rating,
+    comment
+  });
+
+  await review.save();
+  res.status(201).json(review);
+}));
+
+// Update ride images
+router.post('/:id/images', catchAsync(async (req, res) => {
+  const { images } = req.body;
+  const rental = await Rental.findByIdAndUpdate(
+    req.params.id,
+    { userImages: images },
+    { new: true }
   );
 
   if (!rental) throw new AppError('Rental not found', 404);

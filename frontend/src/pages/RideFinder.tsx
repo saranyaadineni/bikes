@@ -402,21 +402,6 @@ export default function RideFinder() {
       }
     }
     
-    try {
-      const profile = await authAPI.getCurrentUser();
-      const userLocId = profile?.currentLocationId ? String(profile.currentLocationId) : '';
-      const navLocId = selectedLocationId || '';
-      if (userLocId && navLocId && userLocId !== navLocId) {
-        toast({
-          title: 'Location Mismatch',
-          description: 'Navbar location and your current location must be the same to book.',
-          variant: 'destructive',
-        });
-        setIsBookingConfirmationOpen(false);
-        return;
-      }
-    } catch {}
-    
     // Calculate duration and amount using new simple pricing model or legacy
     const start = pickupDT || new Date(`${pickupDate}T${pickupTime}`);
     const end = dropoffDT || new Date(`${dropoffDate}T${dropoffTime}`);

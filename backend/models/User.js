@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
     default: '',
     trim: true,
     validate: {
-      validator: (v) => v === '' || /^[6-9]\\d{9}$/.test(v),
+      validator: (v) => v === '' || /^[6-9]\d{9}$/.test(v),
       message: 'Invalid mobile number',
     },
   },
