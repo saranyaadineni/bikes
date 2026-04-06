@@ -61,6 +61,14 @@ interface Message {
   createdAt: string;
 }
 
+const TICKET_CATEGORIES = [
+  { value: 'breakdown', label: 'Bike Breakdown' },
+  { value: 'accident', label: 'Accident' },
+  { value: 'damage', label: 'Damage Report' },
+  { value: 'payment', label: 'Payment Issue' },
+  { value: 'other', label: 'Other' },
+];
+
 export default function Support() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -393,11 +401,11 @@ function CreateTicketDialog({ open, onOpenChange, onSuccess }: { open: boolean; 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="breakdown">Bike Breakdown</SelectItem>
-                  <SelectItem value="accident">Accident</SelectItem>
-                  <SelectItem value="damage">Damage Report</SelectItem>
-                  <SelectItem value="payment">Payment Issue</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  {TICKET_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -408,7 +416,7 @@ function CreateTicketDialog({ open, onOpenChange, onSuccess }: { open: boolean; 
                   <SelectValue placeholder="Select rental" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem key="rental-none" value="none">None</SelectItem>
                   {rentals.map(rental => {
                     let dateStr = '';
                     let bikeName = 'Unknown Bike';
@@ -427,7 +435,7 @@ function CreateTicketDialog({ open, onOpenChange, onSuccess }: { open: boolean; 
                     }
                     
                     return (
-                      <SelectItem key={rental._id} value={rental._id}>
+                      <SelectItem key={rental.id || rental._id} value={rental.id || rental._id}>
                         {bikeName}{dateStr}
                       </SelectItem>
                     );
@@ -576,8 +584,8 @@ function TicketDetailSheet({ ticket, open, onOpenChange, onUpdate }: { ticket: T
         
         <ScrollArea className="flex-1 p-6">
           <div className="space-y-6">
-            {currentTicket.messages.map((msg, idx) => (
-              <div key={idx} className={`flex flex-col ${msg.senderRole === 'user' ? 'items-end' : 'items-start'}`}>
+            {currentTicket.messages.map((msg) => (
+              <div key={msg._id || msg.createdAt} className={`flex flex-col ${msg.senderRole === 'user' ? 'items-end' : 'items-start'}`}>
                 <div className={`max-w-[85%] rounded-lg p-3 ${
                   msg.senderRole === 'user' 
                     ? 'bg-primary text-primary-foreground rounded-tr-none' 
@@ -587,7 +595,7 @@ function TicketDetailSheet({ ticket, open, onOpenChange, onUpdate }: { ticket: T
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       {msg.attachments.map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block">
+                        <a key={`${msg._id}-attach-${i}`} href={url} target="_blank" rel="noopener noreferrer" className="block">
                           <img src={url} alt={`Support ticket attachment ${i + 1}`} className="rounded-md object-cover h-20 w-full" />
                         </a>
                       ))}
@@ -613,10 +621,10 @@ function TicketDetailSheet({ ticket, open, onOpenChange, onUpdate }: { ticket: T
             )}
             {files.length > 0 && (
               <div className="flex flex-wrap gap-2 p-2 bg-muted rounded-md">
-                {files.map((f, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs">
+                {files.map((f) => (
+                  <Badge key={`${f.name}-${f.lastModified}`} variant="secondary" className="text-xs">
                     {f.name}
-                    <button type="button" onClick={() => setFiles(files.filter((_, idx) => idx !== i))} className="ml-1 hover:text-destructive">
+                    <button type="button" onClick={() => setFiles(files.filter((file) => file !== f))} className="ml-1 hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>
                   </Badge>
